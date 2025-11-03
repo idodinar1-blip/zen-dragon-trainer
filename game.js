@@ -340,7 +340,6 @@ function end(){
   // refresh HUD for next combat screen
   drawSideHUD();
 }
-
 /* ========= Template ========= */
 document.getElementById('app').innerHTML = `
   <!-- LOBBY -->
