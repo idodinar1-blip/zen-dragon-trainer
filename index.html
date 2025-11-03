@@ -1,160 +1,246 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
+<meta charset="UTF-8">
 <title>Zen Dragon Trainer</title>
-<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<link rel="stylesheet" href="style.css" />
+<link rel="stylesheet" href="style.css">
 
 <style>
-/* Modal for instructions */
-#instructionsModal{
-  position:fixed; inset:0; background:rgba(0,0,0,.75);
-  backdrop-filter:blur(6px);
-  display:none; align-items:center; justify-content:center; z-index:9999;
+/* extra modal styles (not touching main theme) */
+#instructionsModal {
+  position: fixed;
+  top:0; left:0;
+  width:100%; height:100%;
+  background: rgba(0,0,0,0.75);
+  backdrop-filter: blur(6px);
+  display: none;
+  justify-content:center;
+  align-items:center;
+  z-index:10000;
 }
-#instructionsBox{
-  background:#0f1830; border:1px solid #27345d; border-radius:18px;
-  padding:26px; width:90%; max-width:760px; max-height:85vh; overflow-y:auto;
-}
-.langToggle{float:right; margin-bottom:10px}
-.rtl{direction:rtl; text-align:right}
-</style>
 
+#instructionsBox {
+  background: var(--glass);
+  border: 1px solid rgba(255,255,255,.08);
+  padding: 24px;
+  border-radius: 16px;
+  width: 90%;
+  max-width: 750px;
+  max-height: 90vh;
+  overflow-y: auto;
+  color: var(--tx);
+  position: relative;
+}
+
+#closeInstructions {
+  position:absolute;
+  top:12px; right:12px;
+  background:#ef4444;
+  color:white;
+  border:none;
+  padding:6px 10px;
+  border-radius:8px;
+  cursor:pointer;
+  font-weight:700;
+}
+
+#langToggle {
+  position:absolute;
+  top:12px; left:12px;
+  background:#2b3a69;
+  color:white;
+  border:none;
+  padding:6px 10px;
+  border-radius:8px;
+  cursor:pointer;
+  font-weight:700;
+}
+
+.rtl { direction:rtl; text-align:right; }
+</style>
 </head>
+
 <body>
 
-<!-- LOBBY -->
-<section id="lobby" class="center" style="height:100vh;">
-  <div class="box card">
-    <h1 style="font-size:42px; margin-bottom:10px;">Zen Dragon Trainer</h1>
-    <div style="opacity:.75; margin-bottom:26px; font-size:20px;">
-      Sharpen the mind. Train the warrior.
-    </div>
-
-    <button id="toCombat" class="bigbtn">⚔️ Combat Mode</button>
-    <button id="toPractice" class="bigbtn">📚 Practice Mode</button>
-    <button id="openInstructions" class="bigbtn">📖 Instructions</button>
-  </div>
-</section>
-
-<!-- COMBAT MENU -->
-<section id="combatMenu" class="hidden center" style="height:100vh;">
+<!-- ✅ Lobby -->
+<section id="lobby" class="center">
 <div class="box card">
-  <h2>Choose Battle Level</h2>
-  <button id="cEasy" class="btn">Easy</button>
-  <button id="cMed" class="btn">Medium <span id="medState" class="lock">(locked)</span></button>
-  <button id="cHard" class="btn">Hard <span id="hardState" class="lock">(locked)</span></button>
-  <div class="badge">Length:
-    <select id="lenCombat">
-      <option>10</option><option selected>20</option>
-    </select>
-  </div>
-  <button id="backFromCombat" class="btn">⬅ Back</button>
+<h1>Zen Dragon Trainer</h1>
+<p>Sharpen the mind. Train the warrior.</p>
+<button id="toCombat" class="bigbtn">⚔️ Combat Mode</button>
+<button id="toPractice" class="bigbtn">📚 Practice Mode</button>
+<button id="openInstructions" class="bigbtn">📖 Instructions</button>
 </div>
 </section>
 
-<!-- PRACTICE MENU -->
-<section id="practiceMenu" class="hidden center" style="height:100vh;">
+<!-- ✅ Combat Menu -->
+<section id="combatMenu" class="center hidden">
 <div class="box card">
-  <h2>Select Topic</h2>
-  <button class="btn pTopic" data-topic="m">Multiplication</button>
-  <button class="btn pTopic" data-topic="pow">Exponents</button>
-  <button class="btn pTopic" data-topic="root">Roots</button>
-  <button class="btn pTopic" data-topic="frac">Fractions</button>
-
-  <div class="badge">Length:
-    <select id="lenPractice"><option>20</option><option>30</option></select>
-  </div>
-
-  <button id="backFromPractice" class="btn">⬅ Back</button>
+<h2>Choose Battle Level</h2>
+<button id="cEasy" class="btn">Easy</button>
+<button id="cMed" class="btn">Medium <span id="medState" class="lock">(locked)</span></button>
+<button id="cHard" class="btn">Hard <span id="hardState" class="lock">(locked)</span></button>
+<br>
+Length <select id="lenCombat"><option>10</option><option selected>20</option></select>
+<br><br>
+<button id="backFromCombat" class="btn">⬅ Back</button>
 </div>
 </section>
 
-<!-- GAME -->
-<section id="game" class="hidden">
-  <!-- HUD in game.js renders here -->
+<!-- ✅ Practice Menu -->
+<section id="practiceMenu" class="center hidden">
+<div class="box card">
+<h2>Select Topic</h2>
+<button class="btn pTopic" data-topic="m">Multiplication</button>
+<button class="btn pTopic" data-topic="pow">Exponents</button>
+<button class="btn pTopic" data-topic="root">Roots</button>
+<button class="btn pTopic" data-topic="frac">Fractions</button>
+<br>
+Length <select id="lenPractice"><option>20</option><option>30</option></select>
+<br><br>
+<button id="backFromPractice" class="btn">⬅ Back</button>
+</div>
 </section>
 
-<!-- SUMMARY -->
-<div id="summary"></div>
+<!-- ✅ Game UI loads from game.js -->
+<div id="gameScreen" class="hidden"></div>
 
-<!-- 📘 INSTRUCTIONS MODAL -->
+<!-- ✅ Instructions Modal -->
 <div id="instructionsModal">
   <div id="instructionsBox">
-    <button id="closeInstructions" class="btn">✖</button>
-    <button id="langToggle" class="btn langToggle">עברית</button>
+    <button id="closeInstructions">✖ Exit</button>
+    <button id="langToggle">עברית</button>
     <div id="instructionsContent"></div>
   </div>
 </div>
 
 <script>
-/* === instructions text === */
+/* ===========================
+      FULL INSTRUCTIONS TEXT
+=========================== */
 
-const instEN = `
-<h2>How to Play</h2>
-<b>Goal:</b> faster, sharper mental math.<br><br>
-⚔️ <b>Combat:</b> mixed topics, ranked improvement<br>
-📚 <b>Practice:</b> one topic + mistake review<br><br>
-<b>Progress rules (3 battles avg):</b><br>
-✅ Accuracy ≥ 95%<br>✅ Avg ≤ 1.50s<br>✅ ≤ 3 mistakes<br><br>
-<b>Weak topics:</b><br>
-⏱       slow > 50% of Qs<br>
-✖       ≥ 40% errors<br><br>
-Tip: keep moving — system brings weak topics back.
-`;
-
-const instHE = `
+const textHE = `
 <div class="rtl">
-<h2>הסבר שימוש</h2>
-<b>מטרה:</b> חשיבה מהירה, מדויקת ובביטחון.<br><br>
-⚔️ <b>קרב:</b> תרגול משולב לפי רמה<br>
-📚 <b>תרגול:</b> נושא אחד + תיקון טעויות<br><br>
-<b>התקדמות (ממוצע 3 קרבות):</b><br>
-✅ דיוק ≥ ‎95%<br>✅ זמן ≤ ‎1.50 שניות<br>✅ ≤ ‎3 טעויות<br><br>
-<b>נושאים חלשים:</b><br>
-⏱ איטיות > ‎50% מהשאלות<br>
-✖ טעויות ≥ ‎40% בתחום<br><br>
-טיפ: לא נתקעים — ממשיכים, והמערכת תדאג להחזיר למה שצריך.
+
+<h2>הוראות שימוש</h2>
+
+<b>מטרה</b><br>
+אימון ממוקד לפיתוח מהירות, דיוק וביטחון בחישוב בראש: לוח כפל, חזקות, שורשים ושברים.
+המשחק מזהה חולשות בזמן אמת ודוחף אותך להשתפר בצורה חכמה והדרגתית.
+
+<br><br><b>מצבי משחק</b>
+
+⚔️ <b>מצב קרב (Combat)</b><br>
+תערובת שאלות לפי רמת קושי.  
+בסיום הקרב מתקבלת טבלת הישגים, ניתוח ביצועים והמלצה מה לחזק.
+
+📚 <b>מצב תרגול (Practice)</b><br>
+בחירת נושא אחד והעמקה בו. טעויות נשמרות ומופיעות ב־Review ייעודי.
+
+<br><br><b>איך מתחילים?</b><br>
+בחירת רמה → Start Battle  
+הזמן מתחיל בלחיצה על Start.
+
+<br><br><b>איך עונים?</b><br>
+• מקשי 1–4  
+• לחיצה על המסך  
+תשובה נכונה תשמיע צליל 🎵
+
+<br><br><b>קריטריונים לעליית רמה</b><br>
+(ממוצע 3 הקרבות האחרונים)<br>
+✅ דיוק ≥ 95%  
+✅ זמן ≤ ‎1.50 שניות  
+✅ ≤ 3 טעויות
+
+<br><br><b>HUD — לוח ביצועים</b><br>
+• דיוק  
+• מהירות  
+• טעויות  
+• Weak Topics — נושאים חלשים
+
+<br><br><b>זיהוי חולשות</b><br>
+⏱ איטיות — אם ביותר מ־50% מהשאלות היית איטי מהממוצע  
+✖ ≥40% טעויות בתחום  
+*נושאים איטיים קודמים — זמן הוא קריטי!*
+
+<br><br><b>מערכת תיקון טעויות</b><br>
+טעות נמחקת רק אחרי:  
+✔️ תשובה נכונה ×2  
+✔️ בשני סשני Review שונים  
+✔️ עם אימונים רגילים ביניהם
+
+<br><br><b>טיפ</b><br>
+לא נתקעים — זורמים.  
+המערכת תחזיר אותך בדיוק למה שחייב חיזוק. ⚡
+
 </div>
 `;
 
+const textEN = `
+<h2>Instructions</h2>
+
+<b>Purpose</b><br>
+Train speed, accuracy, and confidence in mental math: multiplication, powers, roots, and fractions.
+Adaptive system that identifies weaknesses and improves you continuously.
+
+<br><br><b>Modes</b>
+
+⚔️ <b>Combat</b><br>
+Mixed topics by difficulty + report + recommendations.
+
+📚 <b>Practice</b><br>
+Focus on one topic. Mistakes saved & reviewed later.
+
+<br><br><b>How to start</b><br>
+Choose difficulty → Start Battle  
+Timer starts only after pressing start.
+
+<br><br><b>How to answer</b><br>
+• Keys 1–4  
+• Click answer  
+Correct = short chime 🎵
+
+<br><br><b>Rank Up Rules</b><br>
+(avg of last 3 battles)<br>
+✅ ≥ 95% accuracy  
+✅ ≤ 1.50s avg time  
+✅ ≤ 3 mistakes
+
+<br><br><b>HUD tracks</b><br>
+• Accuracy  
+• Speed  
+• Mistakes  
+• Weak Topics
+
+<br><br><b>Weakness logic</b><br>
+⏱ Slow >50%  
+✖ ≥40% errors  
+Speed weaknesses appear first — time matters.
+
+<br><br><b>Mistake Bank</b><br>
+2 correct answers across 2 separate review sessions to clear a mistake.
+
+<br><br><b>Pro Tip</b><br>
+Don't freeze — flow. The system will drill what you need.
+`;
+
 let lang = "en";
-function renderInst(){
-  document.getElementById("instructionsContent").innerHTML =
-    lang==="en" ? instEN : instHE;
-  document.getElementById("langToggle").textContent =
-    lang==="en" ? "עברית" : "English";
+function renderInstructions(){
+  instructionsContent.innerHTML = lang==='en' ? textEN : textHE;
+  langToggle.textContent = lang==='en' ? "עברית" : "English";
 }
 
-document.getElementById("openInstructions").onclick = ()=>{
-  document.getElementById("instructionsModal").style.display="flex";
-  renderInst();
-};
-document.getElementById("closeInstructions").onclick = ()=>{
-  document.getElementById("instructionsModal").style.display="none";
-};
-document.getElementById("langToggle").onclick = ()=>{
-  lang = lang==="en" ? "he" : "en";
-  renderInst();
-};
-
-/* === page nav hooks (game.js already handles HUD & gameplay) === */
-function show(id){
-  ["lobby","combatMenu","practiceMenu","game"].forEach(s=>{
-    document.getElementById(s)?.classList.add("hidden");
-  });
-  document.getElementById(id)?.classList.remove("hidden");
-}
-
-document.getElementById("toCombat").onclick = ()=>show("combatMenu");
-document.getElementById("toPractice").onclick = ()=>show("practiceMenu");
-document.getElementById("backFromCombat").onclick = ()=>show("lobby");
-document.getElementById("backFromPractice").onclick = ()=>show("lobby");
+/* buttons */
+openInstructions.onclick = () => { instructionsModal.style.display = "flex"; renderInstructions(); }
+closeInstructions.onclick = () => { instructionsModal.style.display = "none"; }
+langToggle.onclick = () => { lang = lang === "en" ? "he" : "en"; renderInstructions(); };
 </script>
 
+<!-- ✅ Load the actual game engine -->
 <script src="game.js"></script>
+
 </body>
 </html>
 
