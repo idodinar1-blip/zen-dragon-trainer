@@ -106,13 +106,37 @@ function ensureMist(topic,item){PMIST[topic]=PMIST[topic]||[]; let idx=PMIST[top
  if(idx===-1) PMIST[topic].push({t:item.t,a:item.a,streak:0}); savePMist()}
 function markReview(topic,item,ok){let idx=PMIST[topic].findIndex(x=>x.t===item.t&&x.a===item.a);
  if(idx!==-1){PMIST[topic][idx].streak= ok ? (PMIST[topic][idx].streak||0)+1 : 0; savePMist()}}
-function pick(v,a,item){
-  const rt=performance.now()-window.__t; rts.push(rt);
-  document.querySelectorAll('.opt').forEach(n=>{ if(n.getAttribute('data-val')===a)n.classList.add('correct'); if(n.getAttribute('data-val')===v && v!==a)n.classList.add('wrong') });
-  const ok=(v===a), topic=item.topic; if(ok) pling();
-  if(MODE==='practice'){ if(!isReview && !ok) ensureMist(topic,item); else if(isReview) markReview(topic,item,ok); }
-  setTimeout(()=>{i++;render()},150);
+function pick(v, a, item){
+  const rt = performance.now() - window.__t;
+  rts.push(rt);
+
+  // הצגה ויזואלית של נכון/לא נכון
+  document.querySelectorAll('.opt').forEach(n=>{
+    if(n.getAttribute('data-val') === a) n.classList.add('correct');
+    if(n.getAttribute('data-val') === v && v !== a) n.classList.add('wrong');
+  });
+
+  // בדיקת תשובה
+  const ok = (v === a);
+  if (ok) {
+    score++;   // ✅ התיקון: לספור תשובות נכונות
+    pling();   // צליל רק כשהתשובה נכונה
+  }
+
+  // לוגיקת טעויות במצב תרגול
+  const topic = item.topic;
+  if (MODE === 'practice') {
+    if (!isReview && !ok) {
+      ensureMist(topic, item);
+    } else if (isReview) {
+      markReview(topic, item, ok);
+    }
+  }
+
+  // מעבר לשאלה הבאה
+  setTimeout(()=>{ i++; render(); }, 150);
 }
+
 
 // ===== Confetti
 function confetti(){
