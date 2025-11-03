@@ -1,86 +1,30 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<title>Zen Dragon Trainer</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<link rel="stylesheet" href="style.css" />
+  <meta charset="UTF-8" />
+  <title>Zen Dragon Trainer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="style.css" />
 </head>
-
 <body>
-<div id="app"></div>
 
-<!-- Instructions Modal -->
-<div id="instructionsModal" class="hidden">
-  <div class="card" style="max-width:800px; width:90%; padding:24px; overflow-y:auto; max-height:90vh;">
-    <button id="closeInstructions" class="btn" style="float:right;">✖</button>
-    <button id="langToggle" class="btn" style="float:left;">עברית</button>
-    <div style="clear:both;"></div>
-    <div id="instructionsContent"></div>
+  <!-- אפליקציה נטענת ע"י game.js -->
+  <div id="app"></div>
+
+  <!-- Instructions Modal (סטטי; מנוהל ע"י game.js) -->
+  <div id="instructionsModal" class="hidden">
+    <div class="card" style="max-width:880px; width:92%; padding:24px; overflow-y:auto; max-height:90vh;">
+      <button id="closeInstructions" class="btn" style="float:right;">✖</button>
+      <button id="langToggle" class="btn" style="float:left;">עברית</button>
+      <div style="clear:both;"></div>
+      <div id="instructionsContent"></div>
+    </div>
   </div>
-</div>
 
-<script>
-// language content
-const textEN = `
-<h2>Instructions</h2>
-<b>Goal:</b> Boost mental math speed, accuracy & confidence.<br><br>
-⚔️ <b>Combat:</b> mixed questions by difficulty<br>
-📚 <b>Practice:</b> one topic + intelligent mistake review<br><br>
-<b>Rank Up (last 3 battles avg):</b><br>
-✅ ≥95% accuracy<br>
-✅ ≤1.50s per answer<br>
-✅ ≤3 mistakes<br><br>
-<b>Weak topics logic:</b><br>
-⏱ >50% slower than avg → marked for speed<br>
-✖ ≥40% mistakes → marked for accuracy<br><br>
-<b>Tip:</b> Don’t freeze — flow. The system returns what you need.
-`;
-
-const textHE = `
-<div style="direction:rtl;text-align:right;">
-<h2>הוראות</h2>
-<b>מטרה:</b> שיפור מהירות, דיוק וביטחון בחישוב בראש.<br><br>
-⚔️ <b>מצב קרב:</b> שאלות מכל התחומים לפי רמה<br>
-📚 <b>תרגול:</b> נושא אחד + מערכת תיקון טעויות חכמה<br><br>
-<b>עלייה רמה (ממוצע 3 קרבות):</b><br>
-✅ ≥95% דיוק<br>
-✅ ≤1.50 שניות לשאלה<br>
-✅ ≤3 טעויות<br><br>
-<b>איתור חולשות:</b><br>
-⏱ איטיות: ביותר מ־50% מהשאלות היית איטי מהממוצע<br>
-✖ ≥40% טעויות בנושא<br><br>
-<b>טיפ:</b> לא נתקעים — זורמים. המערכת תחזיר אותך בדיוק למה שצריך.
-</div>
-`;
-
-let lang = "en";
-const modal = document.getElementById("instructionsModal");
-const content = document.getElementById("instructionsContent");
-
-function renderInstructions(){
-  content.innerHTML = lang === "en" ? textEN : textHE;
-  document.getElementById("langToggle").textContent = lang === "en" ? "עברית" : "English";
-}
-
-// global button injection (will exist once app loads)
-document.addEventListener("click", e => {
-  if(e.target.id === "instructionsBtn"){
-    modal.classList.remove("hidden");
-    renderInstructions();
-  }
-});
-
-document.getElementById("closeInstructions").onclick = () => modal.classList.add("hidden");
-document.getElementById("langToggle").onclick = () => {
-  lang = lang === "en" ? "he" : "en";
-  renderInstructions();
-};
-</script>
-
-<script src="game.js"></script>
+  <script src="game.js"></script>
 </body>
 </html>
+
 
 
 
