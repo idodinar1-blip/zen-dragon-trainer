@@ -26,11 +26,13 @@ let UNL = JSON.parse(localStorage.getItem('zenUnlocks')||'{"medium":false,"hard"
 let COMHIST = JSON.parse(localStorage.getItem('zenCombatSessions')||'[]');
 let PMIST = JSON.parse(localStorage.getItem('zenPracticeMistakesV2')||'{"m":[],"pow":[],"root":[],"frac":[]}');
 let PCOUNT = JSON.parse(localStorage.getItem('zenPracticeCountsV2')||'{"m":0,"pow":0,"root":0,"frac":0}');
+
 let combatMistTopics = []; // collects mistaken topics during a combat session
+
 const saveUnlocks = ()=>localStorage.setItem('zenUnlocks', JSON.stringify(UNL));
-const saveComHist = ()=>localStorage.setItem('zenCombatSessions', JSON.stringify(COMHIST.slice(-6)));
-const savePMist = ()=>localStorage.setItem('zenPracticeMistakesV2', JSON.stringify(PMIST));
-const savePCount = ()=>localStorage.setItem('zenPracticeCountsV2', JSON.stringify(PCOUNT));
+const saveComHist  = ()=>localStorage.setItem('zenCombatSessions', JSON.stringify(COMHIST.slice(-6)));
+const savePMist    = ()=>localStorage.setItem('zenPracticeMistakesV2', JSON.stringify(PMIST));
+const savePCount   = ()=>localStorage.setItem('zenPracticeCountsV2', JSON.stringify(PCOUNT));
 
 /* ========= Pools ========= */
 const rand=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
@@ -129,19 +131,16 @@ function drawSideHUD(){
   $('hudAcc').textContent=(s.acc==null)?'—':s.acc.toFixed(0)+'%';
   $('hudSpd').textContent=(s.avg==null)?'—':(s.avg/1000).toFixed(2)+'s';
   $('hudBank').textContent=(s.mist==null)?'—':s.mist.toFixed(2);
-// show weakest topic based on last 3 battles (no optional chaining)
-const last3 = COMHIST.slice(-3);
-const last3Weak = last3
-  .map(x => (x && x.weak) ? x.weak : null)
-  .filter(Boolean);
 
-let weakHUD = "—";
-if (last3Weak.length) {
-  const freq = last3Weak.reduce((m,t)=>(m[t]=(m[t]||0)+1,m),{});
-  weakHUD = Object.entries(freq).sort((a,b)=>b[1]-a[1])[0][0];
-}
-$('hudWeak').textContent = weakHUD;
-
+  // show weakest topic based on last 3 battles (robust, no optional chaining)
+  const last3 = COMHIST.slice(-3);
+  const last3Weak = last3.map(x => (x && x.weak) ? x.weak : null).filter(Boolean);
+  let weakHUD = "—";
+  if (last3Weak.length) {
+    const freq = last3Weak.reduce((m,t)=>(m[t]=(m[t]||0)+1,m),{});
+    weakHUD = Object.entries(freq).sort((a,b)=>b[1]-a[1])[0][0];
+  }
+  $('hudWeak').textContent = weakHUD;
 }
 
 function updateLevelBadge(){
@@ -184,9 +183,11 @@ function beginBattle(){
 function startCombat(diff){
   MODE='combat'; DIFF=diff; LENGTH=parseInt($('lenCombat').value||'20');
   qs=combatPool(DIFF).slice(0,LENGTH); total=qs.length;
-  // reset combat mistake topics at the START of each battle
-combatMistTopics = [];
   $('gameTitle').textContent=`Combat — ${diff[0].toUpperCase()+diff.slice(1)}`;
+
+  // reset combat mistake topics at the START of each battle
+  combatMistTopics = [];
+
   enterGame(true);
 }
 
@@ -260,15 +261,18 @@ function pick(v,a,item){
   });
 
   const ok=(v===a);
+
   // track combat mistakes by topic (only in battle mode)
-if (MODE === 'combat' && !ok) {
-  combatMistTopics.push(item.topic);
-}
+  if (MODE === 'combat' && !ok) {
+    combatMistTopics.push(item.topic);
+  }
+
   if(ok){ score++; pling(); }
+
   const topic=item.topic;
   if(MODE==='practice'){
     if(!isReview && !ok) ensureMist(topic,item);
-    else if(isReview) markReview(topic,item,ok);
+    else if(isReview)    markReview(topic,item,ok);
   }
 
   setTimeout(()=>{ i++; render(); },150);
@@ -294,7 +298,6 @@ function confetti(){
   setTimeout(()=>layer.classList.add('hidden'),3100);
 }
 
-/* ========= End Session ========= */
 /* ========= End Session ========= */
 function end(){
   // compute stats
@@ -329,27 +332,25 @@ function end(){
       total: total,
       ts: Date.now()
     });
+
     // derive weakest topic for this battle
-let weak = "-";
-if (combatMistTopics.length) {
-  const freq = combatMistTopics.reduce((m,t)=>(m[t]=(m[t]||0)+1,m),{});
-  weak = Object.entries(freq).sort((a,b)=>b[1]-a[1])[0][0];
-}
-const topicMap = { m:"Multiplication", pow:"Exponents", root:"Roots", frac:"Fractions" };
-const weakName = topicMap[weak] || "-";
+    let weak = "-";
+    if (combatMistTopics.length) {
+      const freq = combatMistTopics.reduce((m,t)=>(m[t]=(m[t]||0)+1,m),{});
+      weak = Object.entries(freq).sort((a,b)=>b[1]-a[1])[0][0]; // most frequent mistaken topic
+    }
+    const topicMap = { m:"Multiplication", pow:"Exponents", root:"Roots", frac:"Fractions" };
+    const weakName = topicMap[weak] || "-";
 
-// attach to last combat record (defensive)
-if (COMHIST.length > 0) {
-  COMHIST[COMHIST.length - 1].weak = weakName;
-}
-
-// reset and persist
-combatMistTopics = [];
-saveComHist();
+    // attach to last combat record and persist
+    if (COMHIST.length > 0) {
+      COMHIST[COMHIST.length - 1].weak = weakName;
+    }
+    combatMistTopics = [];
+    saveComHist();
 
     $('sumPracticeExtra').textContent = '';
-
-    confetti(); // <-- only fires in combat mode
+    confetti(); // only in combat
   }
 
   // write summary lines
@@ -376,6 +377,7 @@ saveComHist();
   // refresh HUD for next combat screen
   drawSideHUD();
 }
+
 /* ========= Template ========= */
 document.getElementById('app').innerHTML = `
   <!-- LOBBY -->
@@ -429,10 +431,7 @@ document.getElementById('app').innerHTML = `
       <div class="metric"><div class="label">Accuracy (avg of last 3)</div><div id="hudAcc" class="value">—</div></div>
       <div class="metric"><div class="label">Avg Time (avg of last 3)</div><div id="hudSpd" class="value">—</div></div>
       <div class="metric"><div class="label">Mistakes / battle (avg of last 3)</div><div id="hudBank" class="value">—</div></div>
-      <div class="metric">
-  <div class="label">Weak Topic (last 3)</div>
-  <div id="hudWeak" class="value">—</div>
-</div>
+      <div class="metric"><div class="label">Weak Topic (last 3)</div><div id="hudWeak" class="value">—</div></div>
       <div class="hint">Targets (measured by <b>average of last 3 battles</b>): Acc ≥ <b>95%</b> • Avg ≤ <b>1.50s</b> • Mistakes ≤ <b>3</b>.</div>
     </div>
     <div id="main" class="card">
@@ -479,3 +478,4 @@ $('btnHome').addEventListener('click',()=>{ $('summary').style.display='none'; s
 
 /* ========= Boot ========= */
 updateLevelBadge(); show('lobby'); drawSideHUD();
+
