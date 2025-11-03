@@ -3,8 +3,8 @@
 /* ========= Shortcuts ========= */
 const $ = id => document.getElementById(id);
 const show = elId => {
-  ["lobby","combatMenu","practiceMenu","game"].forEach(k => $(k)?.classList.add("hidden"));
-  $(elId)?.classList.remove("hidden");
+  ["lobby","combatMenu","practiceMenu","game"].forEach(k => $(k) && $(k).classList.add("hidden"));
+  $(elId) && $(elId).classList.remove("hidden");
 };
 function pling(){
   try{
@@ -22,17 +22,29 @@ function pling(){
 let MODE='combat', DIFF='easy', TOPIC='m', LENGTH=20;
 let qs=[], i=0, score=0, total=0, rts=[], isReview=false;
 
-let UNL = JSON.parse(localStorage.getItem('zenUnlocks')||'{"medium":false,"hard":false}');
+let UNL   = JSON.parse(localStorage.getItem('zenUnlocks')||'{"medium":false,"hard":false}');
 let COMHIST = JSON.parse(localStorage.getItem('zenCombatSessions')||'[]');
 let PMIST = JSON.parse(localStorage.getItem('zenPracticeMistakesV2')||'{"m":[],"pow":[],"root":[],"frac":[]}');
-let PCOUNT = JSON.parse(localStorage.getItem('zenPracticeCountsV2')||'{"m":0,"pow":0,"root":0,"frac":0}');
+let PCOUNT= JSON.parse(localStorage.getItem('zenPracticeCountsV2')||'{"m":0,"pow":0,"root":0,"frac":0}');
 
-let combatMistTopics = []; // collects mistaken topics during a combat session
+// per-topic stats for current combat (for 40% rule)
+let combatTopicStats = {
+  m:    { seen: 0, wrong: 0 },
+  pow:  { seen: 0, wrong: 0 },
+  root: { seen: 0, wrong: 0 },
+  frac: { seen: 0, wrong: 0 }
+};
+function resetCombatStats(){
+  combatTopicStats.m.seen=0;   combatTopicStats.m.wrong=0;
+  combatTopicStats.pow.seen=0; combatTopicStats.pow.wrong=0;
+  combatTopicStats.root.seen=0;combatTopicStats.root.wrong=0;
+  combatTopicStats.frac.seen=0;combatTopicStats.frac.wrong=0;
+}
 
-const saveUnlocks = ()=>localStorage.setItem('zenUnlocks', JSON.stringify(UNL));
-const saveComHist  = ()=>localStorage.setItem('zenCombatSessions', JSON.stringify(COMHIST.slice(-6)));
-const savePMist    = ()=>localStorage.setItem('zenPracticeMistakesV2', JSON.stringify(PMIST));
-const savePCount   = ()=>localStorage.setItem('zenPracticeCountsV2', JSON.stringify(PCOUNT));
+const saveUnlocks=()=>localStorage.setItem('zenUnlocks',JSON.stringify(UNL));
+const saveComHist=()=>localStorage.setItem('zenCombatSessions',JSON.stringify(COMHIST.slice(-6)));
+const savePMist=()=>localStorage.setItem('zenPracticeMistakesV2',JSON.stringify(PMIST));
+const savePCount=()=>localStorage.setItem('zenPracticeCountsV2',JSON.stringify(PCOUNT));
 
 /* ========= Pools ========= */
 const rand=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
@@ -132,20 +144,21 @@ function drawSideHUD(){
   $('hudSpd').textContent=(s.avg==null)?'—':(s.avg/1000).toFixed(2)+'s';
   $('hudBank').textContent=(s.mist==null)?'—':s.mist.toFixed(2);
 
-  // show weakest topic based on last 3 battles (robust, no optional chaining)
+  // show ALL weak topics (union) from last 3 battles, using 40% rule computed per battle
   const last3 = COMHIST.slice(-3);
-  const last3Weak = last3.map(x => (x && x.weak) ? x.weak : null).filter(Boolean);
-  let weakHUD = "—";
-  if (last3Weak.length) {
-    const freq = last3Weak.reduce((m,t)=>(m[t]=(m[t]||0)+1,m),{});
-    weakHUD = Object.entries(freq).sort((a,b)=>b[1]-a[1])[0][0];
+  const allWeak = [];
+  for(const r of last3){
+    if(r && Array.isArray(r.weakList)){
+      for(const w of r.weakList) allWeak.push(w);
+    }
   }
-  $('hudWeak').textContent = weakHUD;
+  const uniq = [];
+  for(const w of allWeak){ if(uniq.indexOf(w)===-1) uniq.push(w); }
+  $('hudWeak').textContent = uniq.length ? uniq.join(', ') : '—';
 }
 
 function updateLevelBadge(){
   const cMed=$('cMed'), cHard=$('cHard');
-  // medium
   if(!UNL.medium){
     cMed.classList.add('lockedBtn');
     if(!cMed.querySelector('.lockIcon')){
@@ -153,9 +166,8 @@ function updateLevelBadge(){
       i.className='lockIcon'; i.textContent='🔒'; cMed.prepend(i);
     }
   } else {
-    cMed.classList.remove('lockedBtn'); cMed.querySelector('.lockIcon')?.remove();
+    cMed.classList.remove('lockedBtn'); cMed.querySelector('.lockIcon') && cMed.querySelector('.lockIcon').remove();
   }
-  // hard
   if(!UNL.hard){
     cHard.classList.add('lockedBtn');
     if(!cHard.querySelector('.lockIcon')){
@@ -163,7 +175,7 @@ function updateLevelBadge(){
       i.className='lockIcon'; i.textContent='🔐'; cHard.prepend(i);
     }
   } else {
-    cHard.classList.remove('lockedBtn'); cHard.querySelector('.lockIcon')?.remove();
+    cHard.classList.remove('lockedBtn'); cHard.querySelector('.lockIcon') && cHard.querySelector('.lockIcon').remove();
   }
   $('medState').textContent= UNL.medium ? '(unlocked)' : '(locked)';
   $('medState').className= UNL.medium ? 'ok' : 'lock';
@@ -185,8 +197,8 @@ function startCombat(diff){
   qs=combatPool(DIFF).slice(0,LENGTH); total=qs.length;
   $('gameTitle').textContent=`Combat — ${diff[0].toUpperCase()+diff.slice(1)}`;
 
-  // reset combat mistake topics at the START of each battle
-  combatMistTopics = [];
+  // start fresh per-topic stats for this battle
+  resetCombatStats();
 
   enterGame(true);
 }
@@ -221,18 +233,24 @@ function render(){
   $('q').textContent=item.t;
   const ops=pick4(item.a,item.topic);
   $('opts').innerHTML=ops.map(o=>`<div class="opt" data-topic="${o.topic}" data-val="${o.v}">${o.v}</div>`).join("");
-  [...document.querySelectorAll('.opt')].forEach(el=>{
-    el.addEventListener('click',()=>pick(el.getAttribute('data-val'), item.a, item));
-  });
+  var nodes=document.querySelectorAll('.opt');
+  for(var z=0; z<nodes.length; z++){
+    (function(el){
+      el.addEventListener('click', function(){
+        pick(el.getAttribute('data-val'), item.a, item);
+      });
+    })(nodes[z]);
+  }
   $('barFill').style.width=(i/total*100)+'%';
   $('progress').textContent=Math.round(i/total*100)+'%';
   window.__t=performance.now();
 }
 
-document.addEventListener('keydown',e=>{
-  if(['1','2','3','4'].includes(e.key)){
-    let b=document.querySelectorAll('.opt')[parseInt(e.key)-1];
-    if(b) b.click();
+document.addEventListener('keydown',function(e){
+  if(['1','2','3','4'].indexOf(e.key)!==-1){
+    var idx=parseInt(e.key)-1;
+    var btns=document.querySelectorAll('.opt');
+    if(btns[idx]) btns[idx].click();
   }
 });
 
@@ -255,16 +273,22 @@ function pick(v,a,item){
   const rt=performance.now()-window.__t;
   rts.push(rt);
 
-  document.querySelectorAll('.opt').forEach(n=>{
+  var options=document.querySelectorAll('.opt');
+  for(var k=0;k<options.length;k++){
+    var n=options[k];
     if(n.getAttribute('data-val')===a) n.classList.add('correct');
     if(n.getAttribute('data-val')===v && v!==a) n.classList.add('wrong');
-  });
+  }
 
   const ok=(v===a);
 
-  // track combat mistakes by topic (only in battle mode)
-  if (MODE === 'combat' && !ok) {
-    combatMistTopics.push(item.topic);
+  // per-topic counters (combat only) for 40% rule
+  if (MODE === 'combat') {
+    const t = item.topic;
+    if (combatTopicStats[t]) {
+      combatTopicStats[t].seen++;
+      if (!ok) combatTopicStats[t].wrong++;
+    }
   }
 
   if(ok){ score++; pling(); }
@@ -275,7 +299,7 @@ function pick(v,a,item){
     else if(isReview)    markReview(topic,item,ok);
   }
 
-  setTimeout(()=>{ i++; render(); },150);
+  setTimeout(function(){ i++; render(); },150);
 }
 
 /* ========= Confetti ========= */
@@ -285,28 +309,26 @@ function confetti(){
   for(let k=0;k<160;k++){
     let d=document.createElement('div'); d.className='conf';
     d.style.left=Math.random()*W+'px'; d.style.top='-20px';
-    d.style.background=`hsl(${Math.floor(Math.random()*360)},100%,60%)`;
+    d.style.background='hsl('+(Math.floor(Math.random()*360))+',100%,60%)';
     let fall=H+80+Math.random()*200,time=2200+Math.random()*800,rot=(Math.random()*720-360);
     d.animate(
       [{transform:'translateY(0) rotate(0deg)'},
-       {transform:`translateY(${fall}px) rotate(${rot}deg)`}],
+       {transform:'translateY('+fall+'px) rotate('+rot+'deg)'}],
       {duration:time,easing:'cubic-bezier(.2,.6,.2,1)'}
     );
     layer.appendChild(d);
-    setTimeout(()=>layer.removeChild(d),time+60);
+    setTimeout((function(dd){return function(){ if(dd.parentNode) dd.parentNode.removeChild(dd); };})(d),time+60);
   }
-  setTimeout(()=>layer.classList.add('hidden'),3100);
+  setTimeout(function(){ layer.classList.add('hidden'); },3100);
 }
 
 /* ========= End Session ========= */
 function end(){
-  // compute stats
   const acc = score / Math.max(1, total) * 100;
   const avg = rts.reduce((x,y)=>x+y,0) / Math.max(1, rts.length);
   let removed = 0;
 
   if (MODE === 'practice') {
-    // practice bookkeeping
     PCOUNT[TOPIC] = (PCOUNT[TOPIC] || 0) + 1; savePCount();
 
     if (isReview) {
@@ -316,13 +338,12 @@ function end(){
       }
       PMIST[TOPIC] = keep; savePMist();
       $('sumPracticeExtra').textContent =
-        `Removed from mistake bank: ${removed}. Rule: each mistake is deleted only after TWO correct answers in TWO separate reviews (with two normal sessions in between).`;
+        'Removed from mistake bank: '+removed+'. Rule: each mistake is deleted only after TWO correct answers in TWO separate reviews (with two normal sessions in between).';
     } else {
       $('sumPracticeExtra').textContent = '';
     }
 
   } else {
-    // combat bookkeeping (+ confetti ONLY in combat)
     const bankCount = total - score;
     COMHIST.push({
       acc: acc,
@@ -333,48 +354,39 @@ function end(){
       ts: Date.now()
     });
 
-    // derive weakest topic for this battle
-    let weak = "-";
-    if (combatMistTopics.length) {
-      const freq = combatMistTopics.reduce((m,t)=>(m[t]=(m[t]||0)+1,m),{});
-      weak = Object.entries(freq).sort((a,b)=>b[1]-a[1])[0][0]; // most frequent mistaken topic
-    }
+    // derive ALL weak topics for this battle by threshold (wrong/seen >= 0.4)
     const topicMap = { m:"Multiplication", pow:"Exponents", root:"Roots", frac:"Fractions" };
-    const weakName = topicMap[weak] || "-";
+    const weakList = Object.keys(combatTopicStats)
+      .filter(function(k){ return combatTopicStats[k].seen>0 && (combatTopicStats[k].wrong / combatTopicStats[k].seen) >= 0.4; })
+      .map(function(k){ return topicMap[k]; });
 
     // attach to last combat record and persist
     if (COMHIST.length > 0) {
-      COMHIST[COMHIST.length - 1].weak = weakName;
+      COMHIST[COMHIST.length - 1].weakList = weakList; // array of strings
     }
-    combatMistTopics = [];
+    resetCombatStats();
     saveComHist();
 
     $('sumPracticeExtra').textContent = '';
-    confetti(); // only in combat
+    confetti();
   }
 
-  // write summary lines
   $('sumLines').innerHTML =
-    `Accuracy: ${acc.toFixed(0)}%<br>Avg Response: ${(avg/1000).toFixed(2)}s`;
+    'Accuracy: '+acc.toFixed(0)+'%<br>Avg Response: '+(avg/1000).toFixed(2)+'s';
 
-  // build summary buttons by mode
   const btns = (MODE === 'combat')
-    ? `<button id="btnAgain" class="bigbtn">⚔️ Another Battle</button>`
-    : `<button id="btnAgain" class="bigbtn">🔁 Another Practice</button>`;
+    ? '<button id="btnAgain" class="bigbtn">⚔️ Another Battle</button>'
+    : '<button id="btnAgain" class="bigbtn">🔁 Another Practice</button>';
 
   $('summaryButtons').innerHTML = btns;
 
-  // bind the dynamic "again" button
-  $('btnAgain').onclick = () => {
+  $('btnAgain').onclick = function(){
     $('summary').style.display = 'none';
     if (MODE === 'combat') startCombat(DIFF);
     else startPractice(TOPIC);
   };
 
-  // finally show the modal (for BOTH modes)
   $('summary').style.display = 'flex';
-
-  // refresh HUD for next combat screen
   drawSideHUD();
 }
 
@@ -431,7 +443,7 @@ document.getElementById('app').innerHTML = `
       <div class="metric"><div class="label">Accuracy (avg of last 3)</div><div id="hudAcc" class="value">—</div></div>
       <div class="metric"><div class="label">Avg Time (avg of last 3)</div><div id="hudSpd" class="value">—</div></div>
       <div class="metric"><div class="label">Mistakes / battle (avg of last 3)</div><div id="hudBank" class="value">—</div></div>
-      <div class="metric"><div class="label">Weak Topic (last 3)</div><div id="hudWeak" class="value">—</div></div>
+      <div class="metric"><div class="label">Weak Topics (last 3)</div><div id="hudWeak" class="value">—</div></div>
       <div class="hint">Targets (measured by <b>average of last 3 battles</b>): Acc ≥ <b>95%</b> • Avg ≤ <b>1.50s</b> • Mistakes ≤ <b>3</b>.</div>
     </div>
     <div id="main" class="card">
@@ -462,20 +474,20 @@ document.getElementById('app').innerHTML = `
 `;
 
 /* ========= Bindings ========= */
-$('toCombat').addEventListener('click',()=>{MODE='combat';updateLevelBadge();show('combatMenu')});
-$('toPractice').addEventListener('click',()=>{MODE='practice';show('practiceMenu')});
-$('backFromCombat').addEventListener('click',()=>show('lobby'));
-$('backFromPractice').addEventListener('click',()=>show('lobby'));
-$('homeBtn').addEventListener('click',()=>show('lobby'));
-$('cEasy').addEventListener('click',()=>startCombat('easy'));
-$('cMed').addEventListener('click',()=>{ if(UNL.medium) startCombat('medium'); else { $('cMed').classList.remove('shake'); void $('cMed').offsetWidth; $('cMed').classList.add('shake'); }});
-$('cHard').addEventListener('click',()=>{ if(UNL.hard) startCombat('hard'); else { $('cHard').classList.remove('shake'); void $('cHard').offsetWidth; $('cHard').classList.add('shake'); }});
-document.querySelectorAll('.pTopic').forEach(b=>b.addEventListener('click',()=>startPractice(b.getAttribute('data-topic'))));
+$('toCombat').addEventListener('click',function(){MODE='combat';updateLevelBadge();show('combatMenu')});
+$('toPractice').addEventListener('click',function(){MODE='practice';show('practiceMenu')});
+$('backFromCombat').addEventListener('click',function(){show('lobby')});
+$('backFromPractice').addEventListener('click',function(){show('lobby')});
+$('homeBtn').addEventListener('click',function(){show('lobby')});
+$('cEasy').addEventListener('click',function(){startCombat('easy')});
+$('cMed').addEventListener('click',function(){ if(UNL.medium) startCombat('medium'); else { $('cMed').classList.remove('shake'); void $('cMed').offsetWidth; $('cMed').classList.add('shake'); }});
+$('cHard').addEventListener('click',function(){ if(UNL.hard) startCombat('hard'); else { $('cHard').classList.remove('shake'); void $('cHard').offsetWidth; $('cHard').classList.add('shake'); }});
+var pt=document.querySelectorAll('.pTopic');
+for(var p=0;p<pt.length;p++){ (function(b){ b.addEventListener('click',function(){ startPractice(b.getAttribute('data-topic')); }); })(pt[p]); }
 $('startBtn').addEventListener('click',beginBattle);
 
 // ONLY keep Home static; "Again" is dynamic inside end()
-$('btnHome').addEventListener('click',()=>{ $('summary').style.display='none'; show('lobby') });
+$('btnHome').addEventListener('click',function(){ $('summary').style.display='none'; show('lobby') });
 
 /* ========= Boot ========= */
 updateLevelBadge(); show('lobby'); drawSideHUD();
-
