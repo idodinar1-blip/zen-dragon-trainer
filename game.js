@@ -129,14 +129,19 @@ function drawSideHUD(){
   $('hudAcc').textContent=(s.acc==null)?'—':s.acc.toFixed(0)+'%';
   $('hudSpd').textContent=(s.avg==null)?'—':(s.avg/1000).toFixed(2)+'s';
   $('hudBank').textContent=(s.mist==null)?'—':s.mist.toFixed(2);
-// show weakest topic based on last 3 battles
-const last3Weak = COMHIST.slice(-3).map(x=>x?.weak).filter(Boolean);
+// show weakest topic based on last 3 battles (no optional chaining)
+const last3 = COMHIST.slice(-3);
+const last3Weak = last3
+  .map(x => (x && x.weak) ? x.weak : null)
+  .filter(Boolean);
+
 let weakHUD = "—";
 if (last3Weak.length) {
   const freq = last3Weak.reduce((m,t)=>(m[t]=(m[t]||0)+1,m),{});
   weakHUD = Object.entries(freq).sort((a,b)=>b[1]-a[1])[0][0];
 }
 $('hudWeak').textContent = weakHUD;
+
 }
 
 function updateLevelBadge(){
@@ -179,6 +184,8 @@ function beginBattle(){
 function startCombat(diff){
   MODE='combat'; DIFF=diff; LENGTH=parseInt($('lenCombat').value||'20');
   qs=combatPool(DIFF).slice(0,LENGTH); total=qs.length;
+  // reset combat mistake topics at the START of each battle
+combatMistTopics = [];
   $('gameTitle').textContent=`Combat — ${diff[0].toUpperCase()+diff.slice(1)}`;
   enterGame(true);
 }
@@ -326,16 +333,17 @@ function end(){
 let weak = "-";
 if (combatMistTopics.length) {
   const freq = combatMistTopics.reduce((m,t)=>(m[t]=(m[t]||0)+1,m),{});
-  weak = Object.entries(freq).sort((a,b)=>b[1]-a[1])[0][0]; // most frequent mistaken topic
+  weak = Object.entries(freq).sort((a,b)=>b[1]-a[1])[0][0];
 }
-
 const topicMap = { m:"Multiplication", pow:"Exponents", root:"Roots", frac:"Fractions" };
 const weakName = topicMap[weak] || "-";
 
-// attach to last combat record
-COMHIST[COMHIST.length - 1].weak = weakName;
+// attach to last combat record (defensive)
+if (COMHIST.length > 0) {
+  COMHIST[COMHIST.length - 1].weak = weakName;
+}
 
-// reset collection and save
+// reset and persist
 combatMistTopics = [];
 saveComHist();
 
