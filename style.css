@@ -72,3 +72,20 @@ body{
 #confetti{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:50}
 .conf{position:absolute;width:10px;height:14px;opacity:.9;will-change:transform}
 
+/* Instructions modal overlay */
+#instructionsModal{
+  position:fixed;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:rgba(0,0,0,.65);
+  z-index:1000;
+}
+#instructionsModal .card{
+  background:#0f1830;
+  color:var(--tx);
+  border:1px solid #27345d;
+  border-radius:16px;
+}
+
