@@ -624,3 +624,4 @@ BTN_LANG.onclick = ()=>{ INS_LANG = (INS_LANG==='en'?'he':'en'); renderInstructi
 /* ========= Boot ========= */
 updateLevelBadge(); show('lobby'); drawSideHUD();
 
+
