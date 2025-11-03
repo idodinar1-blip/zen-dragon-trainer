@@ -442,4 +442,3 @@ $('btnHome').addEventListener('click',()=>{ $('summary').style.display='none'; s
 
 /* ========= Boot ========= */
 updateLevelBadge(); show('lobby'); drawSideHUD();
-
