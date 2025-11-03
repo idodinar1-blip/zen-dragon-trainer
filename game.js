@@ -1,4 +1,4 @@
-/* Zen Dragon v9.7 — modular JS (fractions fix + dwell buffer + Goals UI) */
+/* Zen Dragon v9.8 — fractions distractors fix + goals modal + dwell buffers */
 
 /* ========= Shortcuts ========= */
 const $ = id => document.getElementById(id);
@@ -27,11 +27,11 @@ let COMHIST = JSON.parse(localStorage.getItem('zenCombatSessions')||'[]');
 let PMIST = JSON.parse(localStorage.getItem('zenPracticeMistakesV2')||'{"m":[],"pow":[],"root":[],"frac":[]}');
 let PCOUNT= JSON.parse(localStorage.getItem('zenPracticeCountsV2')||'{"m":0,"pow":0,"root":0,"frac":0}');
 
-/* ======= User Goals (targets) ======= */
+/* ======= User Targets (affect HUD text only) ======= */
 let TARGETS = JSON.parse(localStorage.getItem('zenTargets')||'{"acc":95,"avgMs":1500,"mist":3}');
 function saveTargets(){ localStorage.setItem('zenTargets', JSON.stringify(TARGETS)); }
 
-/* ======= Per-topic dwell buffer (ms) ======= */
+/* ======= Dwell buffers (ms) to be fair for roots/fractions ======= */
 const SLOW_BUFFER = { m:0, pow:0, root:120, frac:250 };
 
 /* ======= Per-combat topic stats ======= */
@@ -42,7 +42,6 @@ let combatTopicStats = {
   frac: { seen: 0, wrong: 0 }
 };
 let combatTopicRts = { m:[], pow:[], root:[], frac:[] };
-
 function resetCombatStats(){
   for(const k of ["m","pow","root","frac"]){
     combatTopicStats[k].seen=0; combatTopicStats[k].wrong=0;
@@ -92,57 +91,96 @@ function fracPool(){
     let g=(m,n)=>{while(n){[m,n]=[n,m%n]}return Math.abs(m)};
     let gg=g(n,d);
     let simp=(n/gg)+'/'+(d/gg);
-    if (d/gg==1) simp=String(n/gg);
+    if (d/gg==1) simp=String(n/gg); // תשובה נכונה יכולה להיות גם שלם
     out.push({t:`${n}/${d}`,a:simp,topic:'frac'});
   }
   return out;
 }
 
-/* ========= Answers (with smart FRACTION distractors) ========= */
+/* ========= Helpers for FRACTIONS ========= */
 function _gcd(a,b){ a=Math.abs(a); b=Math.abs(b); while(b){ [a,b]=[b,a%b]; } return a||1; }
-function _simp(n,d){
-  if(d===0) return "∞";
-  const s=(d<0?-1:1); n*=s; d*=s;
-  const g=_gcd(n,d); n/=g; d/=g;
-  return d===1 ? String(n) : (n+"/"+d);
+function _simpPair(N,D){
+  if(D===0) return [1,0];
+  const s=(D<0?-1:1); N*=s; D*=s;
+  const g=_gcd(N,D); return [N/g, D/g];
 }
-function _isFrac(str){ return typeof str==="string" && /^\s*-?\d+\s*\/\s*-?\d+\s*$/.test(str); }
+function _fmt(N,D){
+  // if denominator == 1, keep integer as "N" (for CORRECT answer allowed),
+  // but for DISTRACTORS אנחנו נמנע מזה (נפסול בהמשך).
+  return (D===1) ? String(N) : (N+"/"+D);
+}
+function _isFracStr(str){ return typeof str==="string" && /^\s*-?\d+\s*\/\s*-?\d+\s*$/.test(str); }
 
+/* ========= Answers (fixed FRACTIONS distractors) ========= */
 function pick4(ans,topic){
-  if(_isFrac(ans)){
-    let [N,D] = ans.split("/").map(x=>parseInt(x.trim(),10));
-    const g=_gcd(N,D); N/=g; D/=g;
-    const set = new Set([ _simp(N,D) ]);
+  // If correct answer is a fraction string (contains '/'), ensure 3+ fraction distractors (no integers)
+  if (_isFracStr(ans)){
+    let [n0,d0] = ans.split('/').map(x=>parseInt(x.trim(),10));
+    [n0,d0] = _simpPair(n0,d0); // normalized correct
 
-    const cand = [
-      _simp(N+1, D), _simp(N-1, D),
-      _simp(N, D+1), _simp(N, D-1),
-      _simp(N+2, D), _simp(N, D+2),
-      _simp(N*2, D*2),     // נראה "נכון" אבל שקול—הסימפליפיקציה תבטיח שונות
-      _simp(N*2+1, D*2),
-      _simp(N*3, D*2)
+    const set = new Set();
+    const pushIf = (N,D)=>{
+      const [nn,dd] = _simpPair(N,D);
+      const s = _fmt(nn,dd);
+      // skip invalid/duplicate/equal-to-ans, and skip distractors that simplify to integer (dd==1)
+      if (dd===1) return false;
+      if (nn===n0 && dd===d0) return false;
+      if (!set.has(s)) { set.add(s); return true; }
+      return false;
+    };
+
+    // seed candidates around the correct ratio
+    const tryCand = [
+      [n0+1, d0],[n0-1, d0],[n0+2, d0],[n0-2, d0],
+      [n0, d0+1],[n0, d0-1],[n0, d0+2],[n0, d0-2],
+      [n0*2+1, d0*2],[n0*3-1, d0*3],[n0*2-1, d0*3+1],
+      [n0*d0+1, d0*d0], [n0*d0-1, d0*d0+1]
     ];
-    for(const c of cand){
-      if(set.size>=4) break;
-      if(c!=="NaN" && c!=="Infinity" && c!=="-Infinity") set.add(c);
+    for(const [N,D] of tryCand){
+      if (set.size>=3) break;
+      if (D && D!==0) pushIf(N,D);
     }
-    while(set.size<4){
-      const n = N + (Math.floor(Math.random()*5)-2);
-      const d = Math.max(2, D + (Math.floor(Math.random()*5)-2));
-      set.add(_simp(n,d));
+    // random nearby if needed
+    while(set.size<3){
+      const N = n0 + (Math.floor(Math.random()*7)-3);
+      let   D = d0 + (Math.floor(Math.random()*7)-3);
+      if (D===0) continue;
+      if (D<0){ D=-D; }
+      pushIf(N,D);
     }
-    return [...set].sort(()=>Math.random()-.5).map(v=>({v,topic}));
+
+    // build final options: include the correct answer (possibly integer or fraction),
+    // but make sure at least 3 others contain '/'
+    const opts = [ _fmt(n0,d0), ...set.values() ];
+    // if correct formatted ended as integer (d0==1), still fine; distractors are proper fractions.
+    return opts.slice(0,4).sort(()=>Math.random()-.5).map(v=>({v,topic}));
   }
 
-  // numeric answers (original behavior with small tweak)
+  // numeric answers: keep numbers; (small tweak avoids NaN/dups)
   let s=new Set([ans]);
   let num=parseFloat(ans);
   while(s.size<4){
     let g = isNaN(num) ? String(rand(2,99)) : String(num + rand(-9,9));
-    if(!s.has(g) && g!=='NaN') s.add(g);
+    if(!s.has(g) && g!=='NaN' && g!=='Infinity' && g!=='-Infinity') s.add(g);
   }
   return [...s].sort(()=>Math.random()-.5).map(v=>({v,topic}));
 }
+
+/* ========= Combat pools ========= */
+function combatPool(d){
+  let set=[];
+  if (d==='easy'){
+    set=[].concat(mulPool([2,3,4,5],[2,3,4,5,6]), powPool(), rootPool(), fracPool());
+  } else if (d==='medium'){
+    set=[].concat(mulPool([3,4,5,6,7],[4,5,6,7,8,9,10]), powPool(), rootPool(), fracPool());
+  } else {
+    set=[].concat(mulPool([6,7,8,9],[6,7,8,9,10]), powPool(), rootPool(), fracPool());
+  }
+  return set.sort(()=>Math.random()-.5);
+}
+const practicePool=(topic)=> []
+  .concat(combatPool('easy'),combatPool('medium'),combatPool('hard'))
+  .filter(x=>x.topic===topic);
 
 /* ========= HUD ========= */
 function last3Stats(){
@@ -164,42 +202,37 @@ function drawSideHUD(){
   $('hudBank').textContent=(s.mist==null)?'—':s.mist.toFixed(2);
 
   const last3 = COMHIST.slice(-3);
-  const dwellSet = new Set(), errSet=new Set();
+  const dwellSet = new Set(), errSet = new Set();
   for (let r of last3){
-    if (!r) continue;
-    (r.weakDwellList||[]).forEach(w=>dwellSet.add(w));
-    (r.weakErrList||[]).forEach(w=>errSet.add(w));
+    (r?.weakDwellList||[]).forEach(w=>dwellSet.add(w));
+    (r?.weakErrList||[]).forEach(w=>errSet.add(w));
   }
   const dwellArr = Array.from(dwellSet);
-  const errArr = Array.from(errSet).filter(x => !dwellSet.has(x));
+  const errArr = Array.from(errSet).filter(x=>!dwellSet.has(x));
   const dwellHTML = dwellArr.map(w => `⏱ <b>${w}</b>`).join(', ');
   const errHTML   = errArr.map(w => `✖ ${w}`).join(', ');
   $('hudWeak').innerHTML = (dwellHTML||errHTML) ? [dwellHTML,errHTML].filter(Boolean).join(', ') : '—';
 
-  // update hint line with current targets
   const hintEl = document.querySelector('.hint');
   if (hintEl) hintEl.innerHTML = hudHintText();
 }
-
 function updateLevelBadge(){
   const cMed=$('cMed'), cHard=$('cHard');
   if(!UNL.medium){
     cMed.classList.add('lockedBtn');
     if(!cMed.querySelector('.lockIcon')){
-      let i=document.createElement('span');
-      i.className='lockIcon'; i.textContent='🔒'; cMed.prepend(i);
+      let i=document.createElement('span'); i.className='lockIcon'; i.textContent='🔒'; cMed.prepend(i);
     }
   } else {
-    cMed.classList.remove('lockedBtn'); cMed.querySelector('.lockIcon') && cMed.querySelector('.lockIcon').remove();
+    cMed.classList.remove('lockedBtn'); cMed.querySelector('.lockIcon')?.remove();
   }
   if(!UNL.hard){
     cHard.classList.add('lockedBtn');
     if(!cHard.querySelector('.lockIcon')){
-      let i=document.createElement('span');
-      i.className='lockIcon'; i.textContent='🔐'; cHard.prepend(i);
+      let i=document.createElement('span'); i.className='lockIcon'; i.textContent='🔐'; cHard.prepend(i);
     }
   } else {
-    cHard.classList.remove('lockedBtn'); cHard.querySelector('.lockIcon') && cHard.querySelector('.lockIcon').remove();
+    cHard.classList.remove('lockedBtn'); cHard.querySelector('.lockIcon')?.remove();
   }
   $('medState').textContent= UNL.medium ? '(unlocked)' : '(locked)';
   $('medState').className= UNL.medium ? 'ok' : 'lock';
@@ -245,22 +278,17 @@ function render(){
   $('q').textContent=item.t;
   const ops=pick4(item.a,item.topic);
   $('opts').innerHTML=ops.map(o=>`<div class="opt" data-topic="${o.topic}" data-val="${o.v}">${o.v}</div>`).join("");
-  var nodes=document.querySelectorAll('.opt');
-  for(var z=0; z<nodes.length; z++){
-    (function(el){
-      el.addEventListener('click', function(){
-        pick(el.getAttribute('data-val'), item.a, item);
-      });
-    })(nodes[z]);
-  }
+  document.querySelectorAll('.opt').forEach(el=>{
+    el.addEventListener('click', ()=> pick(el.getAttribute('data-val'), item.a, item));
+  });
   $('barFill').style.width=(i/total*100)+'%';
   $('progress').textContent=Math.round(i/total*100)+'%';
   window.__t=performance.now();
 }
-document.addEventListener('keydown',function(e){
-  if(['1','2','3','4'].indexOf(e.key)!==-1){
-    var idx=parseInt(e.key)-1;
-    var btns=document.querySelectorAll('.opt');
+document.addEventListener('keydown',e=>{
+  if(['1','2','3','4'].includes(e.key)){
+    const idx=parseInt(e.key)-1;
+    const btns=document.querySelectorAll('.opt');
     if(btns[idx]) btns[idx].click();
   }
 });
@@ -283,12 +311,10 @@ function pick(v,a,item){
   const rt=performance.now()-window.__t;
   rts.push(rt);
 
-  var options=document.querySelectorAll('.opt');
-  for(var k=0;k<options.length;k++){
-    var n=options[k];
+  document.querySelectorAll('.opt').forEach(n=>{
     if(n.getAttribute('data-val')===a) n.classList.add('correct');
     if(n.getAttribute('data-val')===v && v!==a) n.classList.add('wrong');
-  }
+  });
 
   const ok=(v===a);
 
@@ -303,33 +329,30 @@ function pick(v,a,item){
 
   if(ok){ score++; pling(); }
 
-  const topic=item.topic;
   if(MODE==='practice'){
-    if(!isReview && !ok) ensureMist(topic,item);
-    else if(isReview)    markReview(topic,item,ok);
+    if(!isReview && !ok) ensureMist(item.topic,item);
+    else if(isReview)    markReview(item.topic,item,ok);
   }
 
-  setTimeout(function(){ i++; render(); },150);
+  setTimeout(()=>{ i++; render(); },150);
 }
 
 /* ========= Confetti ========= */
 function confetti(){
-  const layer=$('confetti'); layer.classList.remove('hidden');
+  const layer=$('confetti'); layer?.classList.remove('hidden');
   const W=innerWidth,H=innerHeight;
-  for(let k=0;k<160;k++){
+  for(let k=0;k<140;k++){
     let d=document.createElement('div'); d.className='conf';
     d.style.left=Math.random()*W+'px'; d.style.top='-20px';
     d.style.background='hsl('+(Math.floor(Math.random()*360))+',100%,60%)';
-    let fall=H+80+Math.random()*200,time=2200+Math.random()*800,rot=(Math.random()*720-360);
-    d.animate(
-      [{transform:'translateY(0) rotate(0deg)'},
-       {transform:'translateY('+fall+'px) rotate('+rot+'deg)'}],
+    let fall=H+80+Math.random()*200,time=2000+Math.random()*700,rot=(Math.random()*720-360);
+    d.animate([{transform:'translateY(0) rotate(0deg)'},{transform:'translateY('+fall+'px) rotate('+rot+'deg)'}],
       {duration:time,easing:'cubic-bezier(.2,.6,.2,1)'}
     );
     layer.appendChild(d);
-    setTimeout((function(dd){return function(){ if(dd.parentNode) dd.parentNode.removeChild(dd); };})(d),time+60);
+    setTimeout(()=>{ d.remove(); }, time+80);
   }
-  setTimeout(function(){ layer.classList.add('hidden'); },3100);
+  setTimeout(()=> layer?.classList.add('hidden'), 3000);
 }
 
 /* ========= End Session ========= */
@@ -357,25 +380,20 @@ function end(){
     const bankCount = total - score;
     const topicMap = { m:"Multiplication", pow:"Exponents", root:"Roots", frac:"Fractions" };
 
-    // ≥40% errors
     const weakErrList = Object.keys(combatTopicStats)
       .filter(k => combatTopicStats[k].seen>0 && (combatTopicStats[k].wrong / combatTopicStats[k].seen) >= 0.4)
       .map(k => topicMap[k]);
 
-    // >50% slower than (avg + buffer)
     const weakDwellList = Object.keys(combatTopicRts)
       .filter(k => {
         const arr = combatTopicRts[k]; if(!arr.length) return false;
-        const thr = avg + (SLOW_BUFFER[k]||0);
+        const thr = avg + (SLOW_BUFFER[k]||0); // buffer for roots/fractions
         const slow = arr.filter(v=>v>thr).length;
         return (slow/arr.length) > 0.5;
       })
       .map(k => topicMap[k]);
 
-    COMHIST.push({
-      acc, avg, bank: bankCount, correct: score, total,
-      weakErrList, weakDwellList, ts: Date.now()
-    });
+    COMHIST.push({ acc, avg, bank: bankCount, correct: score, total, weakErrList, weakDwellList, ts: Date.now() });
 
     resetCombatStats();
     saveComHist();
@@ -389,7 +407,6 @@ function end(){
   const btns = (MODE === 'combat')
     ? '<button id="btnAgain" class="bigbtn">⚔️ Another Battle</button>'
     : '<button id="btnAgain" class="bigbtn">🔁 Another Practice</button>';
-
   $('summaryButtons').innerHTML = btns;
 
   $('btnAgain').onclick = function(){
@@ -406,7 +423,7 @@ function end(){
 document.getElementById('app').innerHTML = `
   <!-- LOBBY -->
   <section id="lobby" class="center">
-    <div class="box card" style="max-width:720px;width:92%;text-align:center">
+    <div class="box card">
       <h2>Zen Dragon Trainer</h2>
       <p>Sharpen the mind. Train the warrior.</p>
       <button id="toCombat" class="bigbtn">⚔️ Combat Mode</button>
@@ -458,7 +475,7 @@ document.getElementById('app').innerHTML = `
       <div class="metric"><div class="label">Avg Time (avg of last 3)</div><div id="hudSpd" class="value">—</div></div>
       <div class="metric"><div class="label">Mistakes / battle (avg of last 3)</div><div id="hudBank" class="value">—</div></div>
       <div class="metric"><div class="label">Weak Topics (last 3)</div><div id="hudWeak" class="value">—</div></div>
-      <div class="hint">${hudHintText()}</div>
+      <div class="hint">${ (function(){ return `Targets (avg of last 3): Acc ≥ <b>${TARGETS.acc}%</b> • Avg ≤ <b>${(TARGETS.avgMs/1000).toFixed(2)}s</b> • Mistakes ≤ <b>${TARGETS.mist}</b>.`; })() }</div>
     </div>
     <div id="main" class="card">
       <div id="homeBtn" class="topSwitch">Home</div>
@@ -488,201 +505,34 @@ document.getElementById('app').innerHTML = `
 `;
 
 /* ========= Bindings ========= */
-$('toCombat').addEventListener('click',function(){MODE='combat';updateLevelBadge();show('combatMenu')});
-$('toPractice').addEventListener('click',function(){MODE='practice';show('practiceMenu')});
-$('backFromCombat').addEventListener('click',function(){show('lobby')});
-$('backFromPractice').addEventListener('click',function(){show('lobby')});
-$('homeBtn').addEventListener('click',function(){show('lobby')});
-$('cEasy').addEventListener('click',function(){startCombat('easy')});
-$('cMed').addEventListener('click',function(){ if(UNL.medium) startCombat('medium'); else { $('cMed').classList.remove('shake'); void $('cMed').offsetWidth; $('cMed').classList.add('shake'); }});
-$('cHard').addEventListener('click',function(){ if(UNL.hard) startCombat('hard'); else { $('cHard').classList.remove('shake'); void $('cHard').offsetWidth; $('cHard').classList.add('shake'); }});
+$('toCombat').addEventListener('click',()=>{MODE='combat';updateLevelBadge();show('combatMenu')});
+$('toPractice').addEventListener('click',()=>{MODE='practice';show('practiceMenu')});
+$('backFromCombat').addEventListener('click',()=>show('lobby'));
+$('backFromPractice').addEventListener('click',()=>show('lobby'));
+$('homeBtn').addEventListener('click',()=>show('lobby'));
+$('cEasy').addEventListener('click',()=>startCombat('easy'));
+$('cMed').addEventListener('click',()=>{ if(UNL.medium) startCombat('medium'); else { $('cMed').classList.remove('shake'); void $('cMed').offsetWidth; $('cMed').classList.add('shake'); }});
+$('cHard').addEventListener('click',()=>{ if(UNL.hard) startCombat('hard'); else { $('cHard').classList.remove('shake'); void $('cHard').offsetWidth; $('cHard').classList.add('shake'); }});
 document.querySelectorAll('.pTopic').forEach(b=>b.addEventListener('click',()=>startPractice(b.getAttribute('data-topic'))));
 $('startBtn').addEventListener('click',beginBattle);
-$('btnHome').addEventListener('click',function(){ $('summary').style.display='none'; show('lobby') });
+$('btnHome').addEventListener('click',()=>{ $('summary').style.display='none'; show('lobby') });
 
-/* ========= Instructions Modal (dynamic, so index.html לא חייב לשנות) ========= */
-(function injectInstructionsModal(){
-  if (document.getElementById('instructionsModal')) return; // אם קיים באינדקס, לא מוסיף כפול
-  const modalHTML = `
-  <div id="instructionsModal" class="hidden" style="
-      position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
-      background:rgba(0,0,0,.65); z-index:1000;">
-    <div style="max-width:880px; width:92%; max-height:90vh; overflow:auto;
-                background:#0f1830; color:#e8eeff; border:1px solid #27345d; border-radius:16px; padding:24px;">
-      <div style="display:flex; gap:8px; justify-content:space-between; align-items:center; margin-bottom:12px;">
-        <button id="insClose" class="btn">✖</button>
-        <div style="display:flex; gap:8px;">
-          <button id="insLang" class="btn">עברית</button>
-        </div>
-      </div>
-      <div id="insContent" style="font-size:16px; line-height:1.55;"></div>
-    </div>
-  </div>`;
-  document.body.insertAdjacentHTML('beforeend', modalHTML);
-})();
-
-const INS_HE = `
-<div dir="rtl" style="text-align:right">
-<h2>הוראות שימוש</h2>
-
-<h3>מה המטרה?</h3>
-אימון ממוקד לפיתוח מהירות, דיוק וביטחון בחישוב בראש: לוח כפל, חזקות, שורשים ושברים.
-המשחק מאתר את החולשות שלך בזמן אמת ודוחף אותך להשתפר בצורה חכמה והדרגתית.
-
-<h3>מצבי משחק</h3>
-<b>⚔️ מצב קרב (Combat)</b><br>
-תרגול משולב מכל הנושאים, לפי רמת קושי. לאחר כל קרב תופיע טבלת הישגים, ניתוח ביצועים, והמלצה מדויקת מה לחזק.
-
-<br><br>
-<b>📚 מצב תרגול (Practice)</b><br>
-בחירה של נושא אחד והעמקה בו. טעויות נשמרות ומופיעות מחדש באימון ייעודי לנטרול חולשות לאורך זמן.
-
-<h3>איך מתחילים?</h3>
-בוחרים רמה → Start Battle. הזמן מתחיל להימדד רק מהרגע שלוחצים על Start.
-
-<h3>איך עונים?</h3>
-מקשי 1–4 או לחיצה על האפשרות במסך. תשובה נכונה תנגן צליל קצר.
-
-<h3>קריטריונים לעליית רמה</h3>
-(ממוצע של 3 הקרבות האחרונים)<br>
-• דיוק ≥ 95%<br>
-• זמן ממוצע לשאלה ≤ 1.50 שניות<br>
-• ≤ 3 טעויות לקרב
-
-<h3>ה־HUD (לוח התקדמות בצד)</h3>
-מציג נתונים משלושת הקרבות האחרונים: דיוק ממוצע, זמן תשובה ממוצע, כמות טעויות, ו־Weak Topics — נושאים לחיזוק.
-
-<h3>איך מזוהות חולשות?</h3>
-<b>⏱ זמן תגובה איטי:</b> אם ביותר מ־50% מהשאלות בנושא מסוים היית איטי מהממוצע שלך — הנושא יסומן לעדיפות תרגול (מופיע ראשון).<br>
-<b>✖ שיעור טעויות גבוה:</b> אם טעית ב־40% ומעלה מהשאלות בנושא. הנושאים האיטיים מוצגים קודם (זמן הוא אויב משמעותי בפסיכומטרי).
-
-<h3>איך עובדת מערכת תיקון טעויות?</h3>
-בתרגול, כל טעות נשמרת. כדי למחוק אותה צריך לענות עליה נכון פעמיים בשני סשנים נפרדים של Review (וביניהם שני אימונים רגילים).
-כך מיומנות נבנית יציב — לא במקרה.
-
-<h3>טיפ חשוב</h3>
-אל תיעצר על שאלה. זרום. המערכת תחזיר אותך בדיוק למה שדורש חיזוק — אתה מתאמן, לא נבחן.
-</div>
-`;
-const INS_EN = `
-<h2>Instructions</h2>
-
-<h3>Purpose</h3>
-Boost mental calculation speed, accuracy, and confidence — multiplication, powers, roots, and fractions.
-The system tracks weaknesses in real time and adapts training gradually for smart improvement.
-
-<h3>Game Modes</h3>
-<b>⚔️ Combat</b><br>
-Mixed questions by difficulty. After each battle you get a performance report and precise recommendations.
-
-<br><br>
-<b>📚 Practice</b><br>
-Focus on a single topic. Mistakes are saved and resurfaced in structured review sessions to eliminate weaknesses over time.
-
-<h3>How to start</h3>
-Choose difficulty → Start Battle. Timing begins only after you press Start.
-
-<h3>How to answer</h3>
-Keys 1–4 or click. A short chime plays on correct answers.
-
-<h3>Ranking up (avg of last 3 battles)</h3>
-• Accuracy ≥ 95%<br>
-• Avg response ≤ 1.50s<br>
-• ≤ 3 mistakes per battle
-
-<h3>HUD (side panel)</h3>
-Shows averages from your last 3 battles: accuracy, response speed, mistakes, and Weak Topics to target.
-
-<h3>Weakness detection</h3>
-<b>⏱ Slow:</b> >50% of a topic’s questions were slower than your battle average + buffer → speed priority (listed first).<br>
-<b>✖ Errors:</b> ≥40% wrong in a topic → targeted for accuracy.
-
-<h3>Mistake Bank</h3>
-In practice mode, mistakes stay saved. To erase one, answer it correctly twice in two separate reviews with normal sessions in between.
-
-<h3>Pro tip</h3>
-Don’t freeze. Flow. The system will circle back and drill exactly what you need.
-`;
-
-let INS_LANG = 'en';
-function renderInstructions(){
-  const box = $('insContent');
-  if (!box) return;
-  if (INS_LANG === 'en') {
-    box.innerHTML = INS_EN;
-    $('insLang').textContent = 'עברית';
-    box.removeAttribute('dir'); box.style.textAlign = 'start';
-  } else {
-    box.innerHTML = INS_HE;
-    $('insLang').textContent = 'English';
-    box.setAttribute('dir','rtl'); box.style.textAlign = 'right';
-  }
-}
-document.addEventListener('click', (e)=>{
-  if (e.target && e.target.id === 'instructionsBtn') {
-    const modal = $('instructionsModal');
-    if (modal){ modal.classList.remove('hidden'); renderInstructions(); }
-  }
-  if (e.target && e.target.id === 'insClose') { $('instructionsModal')?.classList.add('hidden'); }
-  if (e.target && e.target.id === 'insLang') { INS_LANG = (INS_LANG === 'en') ? 'he' : 'en'; renderInstructions(); }
+/* ===== Open modals from lobby buttons ===== */
+document.addEventListener('click',(e)=>{
+  if(e.target && e.target.id==='instructionsBtn'){ window.__openInstructions && window.__openInstructions(); }
+  if(e.target && e.target.id==='targetsBtn'){ window.__openTargets && window.__openTargets(TARGETS); }
 });
 
-/* ========= Goals (Targets) Modal ========= */
-(function injectTargetsModal(){
-  if (document.getElementById('targetsModal')) return;
-  const html = `
-  <div id="targetsModal" class="hidden" style="
-    position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
-    background:rgba(0,0,0,.65); z-index:1001;">
-    <div class="card" style="max-width:560px;width:92%;padding:22px;background:#0f1830;border:1px solid #27345d">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <h3 style="margin:0">🎯 Set Goals</h3>
-        <button id="tgClose" class="btn">✖</button>
-      </div>
-      <div style="display:grid;gap:12px">
-        <label>Accuracy ≥ <input id="tgAcc" type="number" min="50" max="100" step="1" style="width:88px"> %</label>
-        <label>Avg. time ≤ <input id="tgAvg" type="number" min="300" max="5000" step="10" style="width:88px"> ms</label>
-        <label>Mistakes ≤ <input id="tgMist" type="number" min="0" max="20" step="1" style="width:88px"></label>
-      </div>
-      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px">
-        <button id="tgReset" class="btn">Reset Defaults</button>
-        <button id="tgSave" class="btn">Save</button>
-      </div>
-      <div style="font-size:12px;color:#cfe2ff;opacity:.85;margin-top:8px">
-        These goals affect the HUD targets and your personal benchmarks (no auto-unlock).
-      </div>
-    </div>
-  </div>`;
-  document.body.insertAdjacentHTML('beforeend', html);
-})();
-function openTargets(){
-  $('tgAcc').value = TARGETS.acc;
-  $('tgAvg').value = TARGETS.avgMs;
-  $('tgMist').value= TARGETS.mist;
-  $('targetsModal').classList.remove('hidden');
-}
-function closeTargets(){ $('targetsModal').classList.add('hidden'); }
-function saveTargetsFromUI(){
-  TARGETS.acc   = Math.max(50, Math.min(100, parseInt($('tgAcc').value||TARGETS.acc)));
-  TARGETS.avgMs = Math.max(300, Math.min(5000, parseInt($('tgAvg').value||TARGETS.avgMs)));
-  TARGETS.mist  = Math.max(0,  Math.min(20,  parseInt($('tgMist').value||TARGETS.mist)));
-  saveTargets();
-  // refresh hint text wherever we are
-  document.querySelectorAll('.hint').forEach(h=>h.innerHTML = hudHintText());
-  closeTargets();
-}
-document.addEventListener('click', (e)=>{
-  if(e.target && e.target.id==='targetsBtn') openTargets();
-  if(e.target && e.target.id==='tgClose') closeTargets();
-  if(e.target && e.target.id==='tgSave') saveTargetsFromUI();
-  if(e.target && e.target.id==='tgReset'){
-    TARGETS = { acc:95, avgMs:1500, mist:3 }; saveTargets();
-    $('tgAcc').value=TARGETS.acc; $('tgAvg').value=TARGETS.avgMs; $('tgMist').value=TARGETS.mist;
-    document.querySelectorAll('.hint').forEach(h=>h.innerHTML = hudHintText());
-  }
-});
+/* ===== Handle saving targets from modal (index calls this) ===== */
+window.__saveTargetsFromModal = ()=>{
+  const t = window.__readTargets ? window.__readTargets() : TARGETS;
+  TARGETS = t; saveTargets();
+  document.querySelectorAll('.hint').forEach(h=> h.innerHTML = `Targets (avg of last 3): Acc ≥ <b>${TARGETS.acc}%</b> • Avg ≤ <b>${(TARGETS.avgMs/1000).toFixed(2)}s</b> • Mistakes ≤ <b>${TARGETS.mist}</b>.`);
+  window.__closeTargets && window.__closeTargets();
+};
 
 /* ========= Boot ========= */
 updateLevelBadge(); show('lobby'); drawSideHUD();
+
 
 
