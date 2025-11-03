@@ -170,8 +170,17 @@ function end(){
     } else $('sumPracticeExtra').textContent='';
   } else {
     const bankCount=total-score;
-    COMHIST.push({acc,avg,bank:bankCount,ts:Date.now()}); saveComHist();
-    $('sumPracticeExtra').textContent='';
+    COMHIST.push({
+  acc: acc,                 // accuracy %
+  avg: avg,                 // avg response time
+  bank: bankCount,          // mistakes in this battle
+  correct: score,           // ✅ new - correct answers
+  total: total,             // ✅ new - total questions
+  ts: Date.now()
+});
+saveComHist();
+$('sumPracticeExtra').textContent='';
+
     confetti();
     // Promotion by last-3 averages
     const last3=COMHIST.slice(-3);
