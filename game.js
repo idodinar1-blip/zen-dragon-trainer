@@ -1,4 +1,4 @@
-/* Zen Dragon v9.5 — modular JS (clean full file) */
+/* Zen Dragon v9.6 — modular JS (clean full file) */
 
 /* ========= Shortcuts ========= */
 const $ = id => document.getElementById(id);
@@ -27,18 +27,22 @@ let COMHIST = JSON.parse(localStorage.getItem('zenCombatSessions')||'[]');
 let PMIST = JSON.parse(localStorage.getItem('zenPracticeMistakesV2')||'{"m":[],"pow":[],"root":[],"frac":[]}');
 let PCOUNT= JSON.parse(localStorage.getItem('zenPracticeCountsV2')||'{"m":0,"pow":0,"root":0,"frac":0}');
 
-// per-topic stats for current combat (for 40% rule)
+// per-topic stats for current combat (for 40% errors + dwell-time rule)
 let combatTopicStats = {
   m:    { seen: 0, wrong: 0 },
   pow:  { seen: 0, wrong: 0 },
   root: { seen: 0, wrong: 0 },
   frac: { seen: 0, wrong: 0 }
 };
+// store RTs per topic to detect “slow vs avg”
+let combatTopicRts = { m:[], pow:[], root:[], frac:[] };
+
 function resetCombatStats(){
   combatTopicStats.m.seen=0;   combatTopicStats.m.wrong=0;
   combatTopicStats.pow.seen=0; combatTopicStats.pow.wrong=0;
   combatTopicStats.root.seen=0;combatTopicStats.root.wrong=0;
   combatTopicStats.frac.seen=0;combatTopicStats.frac.wrong=0;
+  combatTopicRts.m=[]; combatTopicRts.pow=[]; combatTopicRts.root=[]; combatTopicRts.frac=[];
 }
 
 const saveUnlocks=()=>localStorage.setItem('zenUnlocks',JSON.stringify(UNL));
@@ -144,17 +148,32 @@ function drawSideHUD(){
   $('hudSpd').textContent=(s.avg==null)?'—':(s.avg/1000).toFixed(2)+'s';
   $('hudBank').textContent=(s.mist==null)?'—':s.mist.toFixed(2);
 
-  // show ALL weak topics (union) from last 3 battles, using 40% rule computed per battle
+  // Aggregate ALL weak topics (union) from last 3 battles.
+  // Dwell topics (⏱, bold) first, then error topics (✖).
   const last3 = COMHIST.slice(-3);
-  const allWeak = [];
-  for(const r of last3){
-    if(r && Array.isArray(r.weakList)){
-      for(const w of r.weakList) allWeak.push(w);
+  const dwellSet = new Set(); // strings (names)
+  const errSet   = new Set();
+
+  for (let r of last3){
+    if (!r) continue;
+    if (Array.isArray(r.weakDwellList)){
+      for (let w of r.weakDwellList) dwellSet.add(w);
+    }
+    if (Array.isArray(r.weakErrList)){
+      for (let w of r.weakErrList) errSet.add(w);
     }
   }
-  const uniq = [];
-  for(const w of allWeak){ if(uniq.indexOf(w)===-1) uniq.push(w); }
-  $('hudWeak').textContent = uniq.length ? uniq.join(', ') : '—';
+
+  // remove duplicates: dwell has precedence in display
+  const dwellArr = Array.from(dwellSet);
+  const errArr = Array.from(errSet).filter(x => !dwellSet.has(x));
+
+  const dwellHTML = dwellArr.map(w => `⏱ <b>${w}</b>`).join(', ');
+  const errHTML   = errArr.map(w => `✖ ${w}`).join(', ');
+  const html = (dwellHTML && errHTML) ? (dwellHTML + (dwellHTML?', ':'') + errHTML) :
+               (dwellHTML || errHTML || '—');
+
+  $('hudWeak').innerHTML = html || '—';
 }
 
 function updateLevelBadge(){
@@ -197,7 +216,7 @@ function startCombat(diff){
   qs=combatPool(DIFF).slice(0,LENGTH); total=qs.length;
   $('gameTitle').textContent=`Combat — ${diff[0].toUpperCase()+diff.slice(1)}`;
 
-  // start fresh per-topic stats for this battle
+  // start fresh per-topic stats/RTs for this battle
   resetCombatStats();
 
   enterGame(true);
@@ -282,13 +301,14 @@ function pick(v,a,item){
 
   const ok=(v===a);
 
-  // per-topic counters (combat only) for 40% rule
+  // per-topic counters (combat only) + collect RT for dwell rule
   if (MODE === 'combat') {
     const t = item.topic;
     if (combatTopicStats[t]) {
       combatTopicStats[t].seen++;
       if (!ok) combatTopicStats[t].wrong++;
     }
+    if (combatTopicRts[t]) combatTopicRts[t].push(rt);
   }
 
   if(ok){ score++; pling(); }
@@ -325,7 +345,7 @@ function confetti(){
 /* ========= End Session ========= */
 function end(){
   const acc = score / Math.max(1, total) * 100;
-  const avg = rts.reduce((x,y)=>x+y,0) / Math.max(1, rts.length);
+  const avg = rts.reduce((x,y)=>x+y,0) / Math.max(1, rts.length); // global avg RT (ms)
   let removed = 0;
 
   if (MODE === 'practice') {
@@ -345,26 +365,40 @@ function end(){
 
   } else {
     const bankCount = total - score;
+
+    // ---- compute weakErrList (≥40% errors) ----
+    const topicMap = { m:"Multiplication", pow:"Exponents", root:"Roots", frac:"Fractions" };
+    const weakErrList = Object.keys(combatTopicStats)
+      .filter(function(k){
+        const st = combatTopicStats[k];
+        return st.seen>0 && (st.wrong / st.seen) >= 0.4;
+      })
+      .map(function(k){ return topicMap[k]; });
+
+    // ---- compute weakDwellList (>50% slow vs global avg) ----
+    const weakDwellList = Object.keys(combatTopicRts)
+      .filter(function(k){
+        const arr = combatTopicRts[k];
+        if (!arr || arr.length===0) return false;
+        let slow = 0;
+        for (let v of arr){ if (v > avg) slow++; } // slow if RT above global avg
+        return (slow / arr.length) > 0.5;
+      })
+      .map(function(k){ return topicMap[k]; });
+
+    // persist this combat
     COMHIST.push({
       acc: acc,
       avg: avg,
       bank: bankCount,
       correct: score,
       total: total,
+      weakErrList: weakErrList,
+      weakDwellList: weakDwellList,
       ts: Date.now()
     });
 
-    // derive ALL weak topics for this battle by threshold (wrong/seen >= 0.4)
-    const topicMap = { m:"Multiplication", pow:"Exponents", root:"Roots", frac:"Fractions" };
-    const weakList = Object.keys(combatTopicStats)
-      .filter(function(k){ return combatTopicStats[k].seen>0 && (combatTopicStats[k].wrong / combatTopicStats[k].seen) >= 0.4; })
-      .map(function(k){ return topicMap[k]; });
-
-    // attach to last combat record and persist
-    if (COMHIST.length > 0) {
-      COMHIST[COMHIST.length - 1].weakList = weakList; // array of strings
-    }
-    resetCombatStats();
+    resetCombatStats(); // ready for next battle
     saveComHist();
 
     $('sumPracticeExtra').textContent = '';
@@ -491,3 +525,4 @@ $('btnHome').addEventListener('click',function(){ $('summary').style.display='no
 
 /* ========= Boot ========= */
 updateLevelBadge(); show('lobby'); drawSideHUD();
+
