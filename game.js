@@ -276,25 +276,31 @@ function confetti(){
 }
 
 /* ========= End Session ========= */
+/* ========= End Session ========= */
 function end(){
-  const acc = score/Math.max(1,total)*100;
-  const avg = rts.reduce((x,y)=>x+y,0)/Math.max(1,rts.length);
-  let removed=0;
+  // compute stats
+  const acc = score / Math.max(1, total) * 100;
+  const avg = rts.reduce((x,y)=>x+y,0) / Math.max(1, rts.length);
+  let removed = 0;
 
-  if(MODE==='practice'){
-    PCOUNT[TOPIC]=(PCOUNT[TOPIC]||0)+1; savePCount();
-    if(isReview){
-      let keep=[];
-      for(let it of (PMIST[TOPIC]||[])){
-        if((it.streak||0)>=2){ removed++; } else { keep.push(it); }
+  if (MODE === 'practice') {
+    // practice bookkeeping
+    PCOUNT[TOPIC] = (PCOUNT[TOPIC] || 0) + 1; savePCount();
+
+    if (isReview) {
+      let keep = [];
+      for (let it of (PMIST[TOPIC] || [])) {
+        if ((it.streak || 0) >= 2) { removed++; } else { keep.push(it); }
       }
-      PMIST[TOPIC]=keep; savePMist();
+      PMIST[TOPIC] = keep; savePMist();
       $('sumPracticeExtra').textContent =
         `Removed from mistake bank: ${removed}. Rule: each mistake is deleted only after TWO correct answers in TWO separate reviews (with two normal sessions in between).`;
     } else {
-      $('sumPracticeExtra').textContent='';
+      $('sumPracticeExtra').textContent = '';
     }
+
   } else {
+    // combat bookkeeping (+ confetti ONLY in combat)
     const bankCount = total - score;
     COMHIST.push({
       acc: acc,
@@ -305,41 +311,33 @@ function end(){
       ts: Date.now()
     });
     saveComHist();
-    $('sumPracticeExtra').textContent='';
-    confetti();
+    $('sumPracticeExtra').textContent = '';
 
-    // Promotion by last-3 averages
-    const last3=COMHIST.slice(-3);
-    const pass= last3.length===3 && (
-      last3.reduce((s,x)=>s+(x.acc||0),0)/3>=95 &&
-      last3.reduce((s,x)=>s+(x.avg||0),0)/3<=1500 &&
-      last3.reduce((s,x)=>s+(x.bank||0),0)/3<=3
-    );
-    if(!UNL.medium && pass){ UNL.medium=true; saveUnlocks(); }
-    else if(UNL.medium && !UNL.hard && pass){ UNL.hard=true; saveUnlocks(); }
+    confetti(); // <-- only fires in combat mode
   }
 
+  // write summary lines
   $('sumLines').innerHTML =
     `Accuracy: ${acc.toFixed(0)}%<br>Avg Response: ${(avg/1000).toFixed(2)}s`;
 
-  // Build summary buttons by mode
-  let btns = (MODE === 'combat')
+  // build summary buttons by mode
+  const btns = (MODE === 'combat')
     ? `<button id="btnAgain" class="bigbtn">⚔️ Another Battle</button>`
     : `<button id="btnAgain" class="bigbtn">🔁 Another Practice</button>`;
 
   $('summaryButtons').innerHTML = btns;
 
-  // Bind dynamic "again"
+  // bind the dynamic "again" button
   $('btnAgain').onclick = () => {
     $('summary').style.display = 'none';
     if (MODE === 'combat') startCombat(DIFF);
     else startPractice(TOPIC);
   };
 
-  // Show modal (critical)
+  // finally show the modal (for BOTH modes)
   $('summary').style.display = 'flex';
 
-  // Update side HUD for next time
+  // refresh HUD for next combat screen
   drawSideHUD();
 }
 
