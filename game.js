@@ -210,7 +210,8 @@ $('btnAgain').addEventListener('click', () => {
   if (MODE === 'combat') startCombat(DIFF);
   else startPractice(TOPIC);
 });
-
+  
+$('summary').style.display = 'flex';   // <-- show the summary modal
   drawSideHUD();
 }
 
@@ -276,18 +277,19 @@ document.getElementById('app').innerHTML = `
     </div>
   </section>
 
-  <!-- SUMMARY -->
-  <div id="summary" class="center">
-    <div id="sumBox" class="card">
-      <div style="font-weight:900">—— SESSION REPORT ——</div><br/>
-      <div id="sumLines"></div><br/>
-      <div id="sumPracticeExtra" style="margin-bottom:10px;"></div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
-       <div id="summaryButtons"></div>
-<button id="btnHome" class="bigbtn">🏠 Home</button>
-      </div>
+ <!-- SUMMARY -->
+<div id="summary" class="center">
+  <div id="sumBox" class="card">
+    <div style="font-weight:900">—— SESSION REPORT ——</div><br/>
+    <div id="sumLines"></div><br/>
+    <div id="sumPracticeExtra" style="margin-bottom:10px;"></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
+      <div id="summaryButtons"></div>
+      <button id="btnHome" class="bigbtn">🏠 Home</button>
     </div>
   </div>
+</div>
+
 
   <div id="confetti" class="hidden"></div>
 `;
@@ -303,8 +305,6 @@ $('cMed').addEventListener('click',()=>{ if(UNL.medium) startCombat('medium'); e
 $('cHard').addEventListener('click',()=>{ if(UNL.hard) startCombat('hard'); else { $('cHard').classList.remove('shake'); void $('cHard').offsetWidth; $('cHard').classList.add('shake'); }});
 document.querySelectorAll('.pTopic').forEach(b=>b.addEventListener('click',()=>startPractice(b.getAttribute('data-topic'))));
 $('startBtn').addEventListener('click',beginBattle);
-$('btnAgain').addEventListener('click',()=>{ $('summary').style.display='none'; startCombat(DIFF) });
-$('btnToPractice').addEventListener('click',()=>{ $('summary').style.display='none'; show('practiceMenu') });
 $('btnHome').addEventListener('click',()=>{ $('summary').style.display='none'; show('lobby') });
 
 // Boot
