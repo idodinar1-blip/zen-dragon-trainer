@@ -193,7 +193,24 @@ $('sumPracticeExtra').textContent='';
     else if(UNL.medium && !UNL.hard && pass){UNL.hard=true; saveUnlocks()}
   }
   $('sumLines').innerHTML=`Accuracy: ${acc.toFixed(0)}%<br>Avg Response: ${(avg/1000).toFixed(2)}s`;
-  $('summary').style.display='flex';
+  // Build correct buttons for summary screen
+let btns = "";
+
+if (MODE === 'combat') {
+  btns += `<button id="btnAgain" class="bigbtn">⚔️ Another Battle</button>`;
+} else {
+  btns += `<button id="btnAgain" class="bigbtn">🔁 Another Practice</button>`;
+}
+
+$('summaryButtons').innerHTML = btns;
+
+// re-bind button
+$('btnAgain').addEventListener('click', () => {
+  $('summary').style.display = 'none';
+  if (MODE === 'combat') startCombat(DIFF);
+  else startPractice(TOPIC);
+});
+
   drawSideHUD();
 }
 
@@ -266,9 +283,8 @@ document.getElementById('app').innerHTML = `
       <div id="sumLines"></div><br/>
       <div id="sumPracticeExtra" style="margin-bottom:10px;"></div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
-        <button id="btnAgain" class="bigbtn">Another Battle</button>
-        <button id="btnToPractice" class="bigbtn">Go to Practice Menu</button>
-        <button id="btnHome" class="bigbtn">Go to Home</button>
+       <div id="summaryButtons"></div>
+<button id="btnHome" class="bigbtn">🏠 Home</button>
       </div>
     </div>
   </div>
