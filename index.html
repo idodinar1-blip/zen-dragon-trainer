@@ -8,22 +8,175 @@
 </head>
 <body>
 
-  <!-- אפליקציה נטענת ע"י game.js -->
+  <!-- אפליקציה נטענת מ-game.js -->
   <div id="app"></div>
 
-  <!-- Instructions Modal (סטטי; מנוהל ע"י game.js) -->
-  <div id="instructionsModal" class="hidden">
-    <div class="card" style="max-width:880px; width:92%; padding:24px; overflow-y:auto; max-height:90vh;">
-      <button id="closeInstructions" class="btn" style="float:right;">✖</button>
-      <button id="langToggle" class="btn" style="float:left;">עברית</button>
-      <div style="clear:both;"></div>
-      <div id="instructionsContent"></div>
+  <!-- 📖 Instructions Modal -->
+  <div id="instructionsModal" class="modal hidden">
+    <div class="modal-box">
+      <div class="modal-head">
+        <button id="closeInstructions" class="btn">✖</button>
+        <button id="langToggle" class="btn">עברית</button>
+      </div>
+      <div id="instructionsContent" class="modal-body"></div>
     </div>
   </div>
+
+  <!-- 🎯 Targets (Goals) Modal -->
+  <div id="targetsModal" class="modal hidden">
+    <div class="modal-box" style="max-width:560px">
+      <div class="modal-head">
+        <h3 style="margin:0">🎯 Set Goals</h3>
+        <button id="tgClose" class="btn">✖</button>
+      </div>
+      <div class="modal-body">
+        <div class="targets-grid">
+          <label>Accuracy ≥ <input id="tgAcc" type="number" min="50" max="100" step="1"> %</label>
+          <label>Avg. time ≤ <input id="tgAvg" type="number" min="300" max="5000" step="10"> ms</label>
+          <label>Mistakes ≤ <input id="tgMist" type="number" min="0" max="20" step="1"></label>
+        </div>
+        <div class="targets-actions">
+          <button id="tgReset" class="btn">Reset Defaults</button>
+          <button id="tgSave" class="btn">Save</button>
+        </div>
+        <div class="targets-hint">
+          These goals update the HUD targets and your personal benchmarks (no auto-unlock).
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  /* ===== Instructions content (HE/EN) ===== */
+  const INS_HE = `
+  <div dir="rtl" style="text-align:right">
+  <h2>הוראות שימוש</h2>
+
+  <h3>מה המטרה?</h3>
+  אימון ממוקד לפיתוח מהירות, דיוק וביטחון בחישוב בראש: לוח כפל, חזקות, שורשים ושברים.
+  המשחק מאתר את החולשות שלך בזמן אמת ודוחף אותך להשתפר בצורה חכמה והדרגתית.
+
+  <h3>מצבי משחק</h3>
+  <b>⚔️ מצב קרב (Combat)</b><br>
+  תרגול משולב מכל הנושאים, לפי רמת קושי. לאחר כל קרב תופיע טבלת הישגים, ניתוח ביצועים, והמלצה מדויקת מה לחזק.
+
+  <br><br>
+  <b>📚 מצב תרגול (Practice)</b><br>
+  בחירה של נושא אחד והעמקה בו. טעויות נשמרות ומופיעות מחדש באימון ייעודי לנטרול חולשות לאורך זמן.
+
+  <h3>איך מתחילים?</h3>
+  בוחרים רמה → Start Battle. הזמן מתחיל להימדד רק מהרגע שלוחצים על Start.
+
+  <h3>איך עונים?</h3>
+  מקשי 1–4 או לחיצה על האפשרות במסך. תשובה נכונה תנגן צליל קצר.
+
+  <h3>קריטריונים לעליית רמה</h3>
+  (ממוצע של 3 הקרבות האחרונים)<br>
+  • דיוק ≥ 95%<br>
+  • זמן ממוצע לשאלה ≤ 1.50 שניות<br>
+  • ≤ 3 טעויות לקרב
+
+  <h3>ה־HUD (לוח התקדמות בצד)</h3>
+  מציג נתונים משלושת הקרבות האחרונים: דיוק ממוצע, זמן תשובה ממוצע, כמות טעויות, ו־Weak Topics — נושאים לחיזוק.
+
+  <h3>איך מזוהות חולשות?</h3>
+  <b>⏱ זמן תגובה איטי:</b> אם ביותר מ־50% מהשאלות בנושא מסוים היית איטי מהממוצע שלך — הנושא יסומן לעדיפות תרגול (מופיע ראשון).<br>
+  <b>✖ שיעור טעויות גבוה:</b> אם טעית ב־40% ומעלה מהשאלות בנושא. הנושאים האיטיים מוצגים קודם (זמן הוא אויב משמעותי בפסיכומטרי).
+
+  <h3>איך עובדת מערכת תיקון טעויות?</h3>
+  בתרגול, כל טעות נשמרת. כדי למחוק אותה צריך לענות עליה נכון פעמיים בשני סשנים נפרדים של Review (וביניהם שני אימונים רגילים).
+  כך מיומנות נבנית יציב — לא במקרה.
+
+  <h3>טיפ חשוב</h3>
+  אל תיעצר על שאלה. זרום. המערכת תחזיר אותך בדיוק למה שדורש חיזוק — אתה מתאמן, לא נבחן.
+  </div>
+  `;
+  const INS_EN = `
+  <h2>Instructions</h2>
+
+  <h3>Purpose</h3>
+  Boost mental calculation speed, accuracy, and confidence — multiplication, powers, roots, and fractions.
+  The system tracks weaknesses in real time and adapts training gradually for smart improvement.
+
+  <h3>Game Modes</h3>
+  <b>⚔️ Combat</b><br>
+  Mixed questions by difficulty. After each battle you get a performance report and precise recommendations.
+
+  <br><br>
+  <b>📚 Practice</b><br>
+  Focus on a single topic. Mistakes are saved and resurfaced in structured review sessions to eliminate weaknesses over time.
+
+  <h3>How to start</h3>
+  Choose difficulty → Start Battle. Timing begins only after you press Start.
+
+  <h3>How to answer</h3>
+  Keys 1–4 or click. A short chime plays on correct answers.
+
+  <h3>Ranking up (avg of last 3 battles)</h3>
+  • Accuracy ≥ 95%<br>
+  • Avg response ≤ 1.50s<br>
+  • ≤ 3 mistakes per battle
+
+  <h3>HUD (side panel)</h3>
+  Shows averages from your last 3 battles: accuracy, response speed, mistakes, and Weak Topics to target.
+
+  <h3>Weakness detection</h3>
+  <b>⏱ Slow:</b> >50% of a topic’s questions were slower than your battle average (with buffer) → speed priority (listed first).<br>
+  <b>✖ Errors:</b> ≥40% wrong in a topic → targeted for accuracy.
+
+  <h3>Mistake Bank</h3>
+  In practice mode, mistakes stay saved. To erase one, answer it correctly twice in two separate reviews with normal sessions in between.
+
+  <h3>Pro tip</h3>
+  Don’t freeze. Flow. The system will circle back and drill exactly what you need.
+  `;
+
+  /* Modal logic */
+  let INS_LANG = 'en';
+  const insModal = document.getElementById('instructionsModal');
+  const insContent = document.getElementById('instructionsContent');
+  const insLangBtn = document.getElementById('langToggle');
+
+  function renderInstructions(){
+    if (INS_LANG==='en'){ insContent.innerHTML = INS_EN; insLangBtn.textContent='עברית'; insContent.removeAttribute('dir'); insContent.style.textAlign='start'; }
+    else { insContent.innerHTML = INS_HE; insLangBtn.textContent='English'; insContent.setAttribute('dir','rtl'); insContent.style.textAlign='right'; }
+  }
+  document.getElementById('closeInstructions').onclick = () => insModal.classList.add('hidden');
+  document.getElementById('langToggle').onclick = () => { INS_LANG = (INS_LANG==='en')?'he':'en'; renderInstructions(); };
+
+  // משחק יפתח את המודל ע"י כפתור עם id="instructionsBtn"
+  window.__openInstructions = () => { insModal.classList.remove('hidden'); renderInstructions(); };
+
+  // Goals modal logic (called from game)
+  const tgModal = document.getElementById('targetsModal');
+  const tgAcc   = document.getElementById('tgAcc');
+  const tgAvg   = document.getElementById('tgAvg');
+  const tgMist  = document.getElementById('tgMist');
+
+  window.__openTargets = (targets) => {
+    tgAcc.value  = targets.acc;
+    tgAvg.value  = targets.avgMs;
+    tgMist.value = targets.mist;
+    tgModal.classList.remove('hidden');
+  };
+  window.__closeTargets = () => tgModal.classList.add('hidden');
+  window.__readTargets = () => ({
+    acc:  Math.max(50, Math.min(100, parseInt(tgAcc.value||95))),
+    avgMs:Math.max(300, Math.min(5000, parseInt(tgAvg.value||1500))),
+    mist: Math.max(0,  Math.min(20,  parseInt(tgMist.value||3)))
+  });
+
+  document.getElementById('tgClose').onclick = () => window.__closeTargets();
+  document.getElementById('tgSave').onclick  = () => { window.__saveTargetsFromModal && window.__saveTargetsFromModal(); };
+  document.getElementById('tgReset').onclick = () => {
+    tgAcc.value=95; tgAvg.value=1500; tgMist.value=3;
+  };
+  </script>
 
   <script src="game.js"></script>
 </body>
 </html>
+
 
 
 
