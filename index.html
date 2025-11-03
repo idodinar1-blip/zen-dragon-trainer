@@ -15,31 +15,40 @@ body{
   height:100vh;
   overflow:hidden;
 }
-
 .hidden{display:none!important;}
-.center{display:flex;justify-content:center;align-items:center;height:100%;width:100%;}
+.center{
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  height:100%;
+  width:100%;
+}
+
+/* ==== CARDS ==== */
 .card{
   background:#1c1c1c;
-  padding:24px;
+  padding:32px;
   border-radius:14px;
-  box-shadow:0 0 25px rgba(0,255,255,.2);
+  box-shadow:0 0 35px rgba(0,255,255,.25);
   text-align:center;
-  max-width:420px;
+  width:60vw;
+  max-width:900px;
 }
 
 /* ==== BUTTONS ==== */
 .bigbtn{
   background:#0af;
   border:0;
-  padding:14px 20px;
-  border-radius:10px;
+  padding:16px 24px;
+  border-radius:12px;
   margin:8px;
-  font-size:18px;
+  font-size:20px;
   cursor:pointer;
   color:white;
   font-weight:bold;
 }
 .bigbtn:hover{background:#09c;}
+
 .btn{
   background:#444;
   border:0;
@@ -49,73 +58,77 @@ body{
   color:white;
   cursor:pointer;
 }
-.btn:hover{background:#555;}
+.btn:hover{background:#555}
 
-/* ==== HUD ==== */
+/* ==== GAME HUD ==== */
 #side{
   position:absolute;
   left:0;top:0;
-  width:220px;
-  padding:16px;
+  width:230px;
+  padding:18px;
   background:#0009;
   border-right:1px solid #0af;
   height:100%;
 }
-.metric{margin-bottom:12px;text-align:left;}
+.metric{margin-bottom:14px;text-align:left;}
 .label{font-size:12px;color:#aaa;}
 .value{font-size:20px;font-weight:bold;}
 .hint{font-size:12px;color:#888;margin-top:10px;}
 
-/* ==== SUMMARY & INSTRUCTIONS MODAL ==== */
+/* ==== MODALS ==== */
 #summary,#instructionsScreen{
   position:fixed;
-  top:0; left:0;
-  width:100%; height:100%;
-  background:#000d;
+  top:0;left:0;
+  width:100%;height:100%;
+  background:#000c;
   display:none;
-  justify-content:center;align-items:center;
-  z-index:50;
+  justify-content:center;
+  align-items:center;
+  z-index:999;
 }
 
 .instructionsBox{
   background:#1c1c1c;
-  padding:24px;
-  border-radius:16px;
-  max-width:700px;
-  width:90%;
-  max-height:90vh;
+  padding:28px;
+  border-radius:18px;
+  width:80vw;
+  max-width:850px;
+  max-height:85vh;
   overflow-y:auto;
   text-align:start;
+  font-size:18px;
 }
-
 .langBtn{float:right;margin-bottom:12px;}
 .rtl{direction:rtl;text-align:right;}
 </style>
-
 </head>
-<body>
 
-<div id="app">
+<body>
 
 <!-- ✅ LOBBY -->
 <section id="lobby" class="center">
 <div class="card">
-<h2>Zen Dragon Trainer</h2>
-<button id="toCombat" class="bigbtn">⚔️ Combat</button>
-<button id="toPractice" class="bigbtn">📚 Practice</button>
+<h1 style="margin-top:0;">Zen Dragon Trainer</h1>
+<p style="font-size:20px;margin-bottom:24px;opacity:.8">
+Sharpen the mind. Train the warrior.
+</p>
+
+<button id="toCombat" class="bigbtn">⚔️ Combat Mode</button>
+<button id="toPractice" class="bigbtn">📘 Practice Mode</button>
 <button id="toInstructions" class="bigbtn">📖 Instructions</button>
+
 </div>
 </section>
 
 <!-- ✅ COMBAT MENU -->
 <section id="combatMenu" class="center hidden">
 <div class="card">
-<h3>Choose Battle Level</h3>
+<h2>Choose Battle Level</h2>
 <button id="cEasy" class="btn">Easy</button>
 <button id="cMed" class="btn">Medium <span id="medState">(locked)</span></button>
 <button id="cHard" class="btn">Hard <span id="hardState">(locked)</span></button>
-<br>
-Length 
+<br><br>
+Length:
 <select id="lenCombat"><option>10</option><option selected>20</option></select>
 <br><br>
 <button id="backFromCombat" class="btn">⬅ Back</button>
@@ -125,13 +138,13 @@ Length
 <!-- ✅ PRACTICE MENU -->
 <section id="practiceMenu" class="center hidden">
 <div class="card">
-<h3>Select Topic</h3>
+<h2>Select Topic</h2>
 <button class="btn pTopic" data-topic="m">Multiplication</button>
 <button class="btn pTopic" data-topic="pow">Exponents</button>
 <button class="btn pTopic" data-topic="root">Roots</button>
 <button class="btn pTopic" data-topic="frac">Fractions</button>
-<br>
-Length 
+<br><br>
+Length:
 <select id="lenPractice"><option>20</option><option>30</option></select>
 <br><br>
 <button id="backFromPractice" class="btn">⬅ Back</button>
@@ -147,26 +160,26 @@ Length
 <div class="metric"><div class="label">Mistakes</div><div id="hudBank" class="value">—</div></div>
 <div class="metric"><div class="label">Weak Topics</div><div id="hudWeak" class="value">—</div></div>
 
-<div class="hint">Target: 95% • ≤1.5s • ≤3</div>
+<div class="hint">Goal: 95% • ≤1.5s • ≤3 mistakes</div>
 <button id="homeBtn" class="btn">🏠 Home</button>
 </div>
 
-<div class="card" style="max-width:600px;margin:auto">
+<div class="card">
 <h1 id="gameTitle">Zen Dragon</h1>
-<div class="bar"><span id="barFill" style="display:block;height:6px;width:0;background:#0af;border-radius:6px"></span></div>
-
-<div id="startWrap"><button id="startBtn" class="bigbtn">Start</button></div>
-<div id="q" class="q" style="font-size:40px;display:none">×</div>
-<div id="opts" class="options" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;"></div>
-
-<div id="progress" class="mini">0%</div>
+<div class="bar">
+<span id="barFill" style="display:block;height:6px;width:0;background:#0af;border-radius:6px"></span>
+</div>
+<div id="startWrap"><button id="startBtn" class="bigbtn">Start Battle</button></div>
+<div id="q" class="q" style="font-size:48px;display:none">×</div>
+<div id="opts" class="options" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;"></div>
+<div id="progress" style="font-size:16px;margin-top:12px;">0%</div>
 </div>
 </section>
 
 <!-- ✅ SUMMARY -->
 <div id="summary" class="center">
-<div class="card">
-<h3>Session Report</h3>
+<div class="instructionsBox" style="text-align:center">
+<h2>Session Report</h2>
 <div id="sumLines"></div><br>
 <div id="sumPracticeExtra"></div>
 <div id="summaryButtons"></div><br>
@@ -183,87 +196,63 @@ Length
 </div>
 </div>
 
-</div>
-
 <script>
-/* ========== ✅ FULL TEXT CONTENT ========== */
+/* ==== TEXT ==== */
 const textEN = `
-<h2>Instructions</h2>
+<h2>How to Use</h2>
 <b>Goal:</b> fast, accurate, confident mental math.<br><br>
-
-⚔️ <b>Combat</b>: mixed topics, timed, performance-based progress<br>
-📚 <b>Practice</b>: one topic + smart mistake review system<br><br>
-
-<b>How to play</b><br>
-• Choose mode → difficulty/topic → Start<br>
-• Answer with mouse or keys 1-4<br>
-• Correct = sound + instant next<br><br>
-
-<b>Rank-up rules (avg of last 3 battles)</b><br>
-✅ Accuracy ≥ 95%<br>
-✅ Avg time ≤ 1.50s<br>
+⚔️ <b>Combat</b>: mixed questions by difficulty<br>
+📚 <b>Practice</b>: focus on one topic + mistake review<br><br>
+<b>Level Up Rules (last 3 battles avg):</b><br>
+✅ ≥ 95% accuracy<br>
+✅ ≤ 1.50s avg time<br>
 ✅ ≤ 3 mistakes<br><br>
-
-<b>Weak topic logic</b><br>
-⏱ Slow: >50% slower than personal avg<br>
-✖ Wrong: ≥40% mistakes in topic<br>
-→ Slow topics displayed first<br><br>
-
-<b>Tip:</b> Don’t freeze — flow. The system brings weak topics back automatically.
+<b>Weak topic logic:</b><br>
+⏱ Slow: >50% slower than avg<br>
+✖ Mistakes: ≥40%<br><br>
+<b>Tip:</b> don't stop — flow. The system will bring back weak topics automatically.
 `;
 
 const textHE = `
 <div class="rtl">
-<h2>הוראות שימוש</h2>
-
+<h2>הסברי</h2>
 <b>מטרה:</b> חישוב מהיר, מדויק ובטוח בראש.<br><br>
-
-⚔️ <b>מצב קרב:</b> תרגול מעורב לפי רמה<br>
-📚 <b>תרגול:</b> נושא אחד + מערכת תיקון טעויות חכמה<br><br>
-
-<b>איך משחקים</b><br>
-• בוחרים מצב → רמה/נושא → התחל<br>
-• עונים עם עכבר או מקשים 1-4<br>
-• תשובה נכונה = צליל והתקדמות מיידית<br><br>
-
-<b>קידום רמה (ממוצע 3 קרבות אחרונים)</b><br>
+⚔️ <b>קרב:</b> שאלות מעורבות לפי רמה<br>
+📚 <b>תרגול:</b> נושא בודד + חיזוק טעויות<br><br>
+<b>עלייה רמה (ממוצע 3 קרבות):</b><br>
 ✅ דיוק ≥ ‎95%<br>
-✅ זמן תגובה ≤ ‎1.50 שניות<br>
+✅ זמן ≤ ‎1.50 שניות<br>
 ✅ ≤ 3 טעויות<br><br>
-
-<b>זיהוי נושאים חלשים</b><br>
-⏱ איטיות: >50% איטי מהממוצע האישי<br>
-✖ טעויות: ≥40% טעויות באותו נושא<br>
-→ נושאים איטיים קודם<br><br>
-
-<b>טיפ:</b> לא נתקעים — זורמים. המערכת תחזיר אותך למה שצריך.
+<b>איתור חולשות:</b><br>
+⏱ איטיות: >50% איטי מהממוצע<br>
+✖ טעויות: ≥40% באותו נושא<br><br>
+<b>טיפ:</b> לא עוצרים — זורמים. המערכת תחזיר אותך למה שצריך.
 </div>
 `;
 
-let lang = "en";
-const setInstructions = ()=>{
+let lang="en";
+const setInst=()=>{
   document.getElementById("instructionsText").innerHTML =
-    lang==="en" ? textEN : textHE;
+    lang==="en"?textEN:textHE;
   document.getElementById("langToggle").textContent =
-    lang==="en" ? "עברית" : "English";
+    lang==="en"?"עברית":"English";
 };
-document.getElementById("langToggle").onclick = ()=>{
-  lang = lang==="en"?"he":"en";
-  setInstructions();
-};
-document.getElementById("toInstructions").onclick = ()=>{
+document.getElementById("toInstructions").onclick=()=>{
   document.getElementById("instructionsScreen").style.display="flex";
-  setInstructions();
+  setInst();
 };
-document.getElementById("closeInstructions").onclick = ()=>{
+document.getElementById("closeInstructions").onclick=()=>{
   document.getElementById("instructionsScreen").style.display="none";
+};
+document.getElementById("langToggle").onclick=()=>{
+  lang=lang==="en"?"he":"en";
+  setInst();
 };
 </script>
 
-<!-- ✅ LOAD GAME JS -->
 <script src="game.js"></script>
-
 </body>
 </html>
+
 
 
