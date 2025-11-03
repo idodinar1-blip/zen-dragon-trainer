@@ -147,32 +147,20 @@ function drawSideHUD(){
   $('hudSpd').textContent=(s.avg==null)?'—':(s.avg/1000).toFixed(2)+'s';
   $('hudBank').textContent=(s.mist==null)?'—':s.mist.toFixed(2);
 
-  // Aggregate ALL weak topics (union) from last 3 battles.
-  // Dwell topics (⏱, bold) first, then error topics (✖).
+  // union of weak topics from last 3 sessions (dwell first)
   const last3 = COMHIST.slice(-3);
-  const dwellSet = new Set(); // strings (names)
+  const dwellSet = new Set();
   const errSet   = new Set();
-
   for (let r of last3){
     if (!r) continue;
-    if (Array.isArray(r.weakDwellList)){
-      for (let w of r.weakDwellList) dwellSet.add(w);
-    }
-    if (Array.isArray(r.weakErrList)){
-      for (let w of r.weakErrList) errSet.add(w);
-    }
+    (r.weakDwellList||[]).forEach(w=>dwellSet.add(w));
+    (r.weakErrList||[]).forEach(w=>errSet.add(w));
   }
-
-  // remove duplicates: dwell has precedence in display
   const dwellArr = Array.from(dwellSet);
-  const errArr = Array.from(errSet).filter(x => !dwellSet.has(x));
-
-  const dwellHTML = dwellArr.map(w => `⏱ <b>${w}</b>`).join(', ');
-  const errHTML   = errArr.map(w => `✖ ${w}`).join(', ');
-  const html = (dwellHTML && errHTML) ? (dwellHTML + (dwellHTML?', ':'') + errHTML) :
-               (dwellHTML || errHTML || '—');
-
-  $('hudWeak').innerHTML = html || '—';
+  const errArr   = Array.from(errSet).filter(x=>!dwellSet.has(x));
+  const dwellHTML = dwellArr.map(w=>`⏱ <b>${w}</b>`).join(', ');
+  const errHTML   = errArr.map(w=>`✖ ${w}`).join(', ');
+  $('hudWeak').innerHTML = (dwellHTML||errHTML) ? [dwellHTML,errHTML].filter(Boolean).join(', ') : '—';
 }
 
 function updateLevelBadge(){
@@ -214,10 +202,7 @@ function startCombat(diff){
   MODE='combat'; DIFF=diff; LENGTH=parseInt($('lenCombat').value||'20');
   qs=combatPool(DIFF).slice(0,LENGTH); total=qs.length;
   $('gameTitle').textContent=`Combat — ${diff[0].toUpperCase()+diff.slice(1)}`;
-
-  // start fresh per-topic stats/RTs for this battle
   resetCombatStats();
-
   enterGame(true);
 }
 
@@ -300,7 +285,6 @@ function pick(v,a,item){
 
   const ok=(v===a);
 
-  // per-topic counters (combat only) + collect RT for dwell rule
   if (MODE === 'combat') {
     const t = item.topic;
     if (combatTopicStats[t]) {
@@ -312,10 +296,9 @@ function pick(v,a,item){
 
   if(ok){ score++; pling(); }
 
-  const topic=item.topic;
   if(MODE==='practice'){
-    if(!isReview && !ok) ensureMist(topic,item);
-    else if(isReview)    markReview(topic,item,ok);
+    if(!isReview && !ok) ensureMist(item.topic,item);
+    else if(isReview)    markReview(item.topic,item,ok);
   }
 
   setTimeout(function(){ i++; render(); },150);
@@ -344,7 +327,7 @@ function confetti(){
 /* ========= End Session ========= */
 function end(){
   const acc = score / Math.max(1, total) * 100;
-  const avg = rts.reduce((x,y)=>x+y,0) / Math.max(1, rts.length); // global avg RT (ms)
+  const avg = rts.reduce((x,y)=>x+y,0) / Math.max(1, rts.length);
   let removed = 0;
 
   if (MODE === 'practice') {
@@ -365,7 +348,6 @@ function end(){
   } else {
     const bankCount = total - score;
 
-    // ---- compute weakErrList (≥40% errors) ----
     const topicMap = { m:"Multiplication", pow:"Exponents", root:"Roots", frac:"Fractions" };
     const weakErrList = Object.keys(combatTopicStats)
       .filter(function(k){
@@ -374,18 +356,16 @@ function end(){
       })
       .map(function(k){ return topicMap[k]; });
 
-    // ---- compute weakDwellList (>50% slow vs global avg) ----
     const weakDwellList = Object.keys(combatTopicRts)
       .filter(function(k){
         const arr = combatTopicRts[k];
         if (!arr || arr.length===0) return false;
         let slow = 0;
-        for (let v of arr){ if (v > avg) slow++; } // slow if RT above global avg
+        for (let v of arr){ if (v > avg) slow++; }
         return (slow / arr.length) > 0.5;
       })
       .map(function(k){ return topicMap[k]; });
 
-    // persist this combat
     COMHIST.push({
       acc: acc,
       avg: avg,
@@ -397,7 +377,7 @@ function end(){
       ts: Date.now()
     });
 
-    resetCombatStats(); // ready for next battle
+    resetCombatStats();
     saveComHist();
 
     $('sumPracticeExtra').textContent = '';
@@ -523,28 +503,7 @@ $('startBtn').addEventListener('click',beginBattle);
 // ONLY keep Home static; "Again" is dynamic inside end()
 $('btnHome').addEventListener('click',function(){ $('summary').style.display='none'; show('lobby') });
 
-/* ========= Instructions Modal (dynamic) ========= */
-/* 1) Inject modal container to DOM (works without touching index.html) */
-(function injectInstructionsModal(){
-  const modalHTML = `
-  <div id="instructionsModal" class="hidden" style="
-      position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
-      background:rgba(0,0,0,.65); z-index:1000;">
-    <div style="max-width:880px; width:92%; max-height:90vh; overflow:auto;
-                background:#0f1830; color:#e8eeff; border:1px solid #27345d; border-radius:16px; padding:24px;">
-      <div style="display:flex; gap:8px; justify-content:space-between; align-items:center; margin-bottom:12px;">
-        <button id="insClose" class="btn">✖</button>
-        <div style="display:flex; gap:8px;">
-          <button id="insLang" class="btn">עברית</button>
-        </div>
-      </div>
-      <div id="insContent" style="font-size:16px; line-height:1.55;"></div>
-    </div>
-  </div>`;
-  document.body.insertAdjacentHTML('beforeend', modalHTML);
-})();
-
-/* 2) Texts (HE high-quality + EN polished) */
+/* ========= Instructions Modal (using static IDs from index.html) ========= */
 const INS_HE = `
 <div dir="rtl" style="text-align:right">
 <h2>הוראות שימוש</h2>
@@ -629,41 +588,38 @@ In practice mode, mistakes stay saved. To erase one, answer it correctly twice i
 Don’t freeze. Flow. The system will circle back and drill exactly what you need.
 `;
 
-/* 3) Behavior */
 let INS_LANG = 'en';
+const MODAL   = document.getElementById('instructionsModal');
+const CNT     = document.getElementById('instructionsContent');
+const BTN_X   = document.getElementById('closeInstructions');
+const BTN_LANG= document.getElementById('langToggle');
+
 function renderInstructions(){
-  const box = $('insContent');
-  if (!box) return;
-  if (INS_LANG === 'en') {
-    box.innerHTML = INS_EN;
-    $('insLang').textContent = 'עברית';
-    box.removeAttribute('dir');
-    box.style.textAlign = 'start';
-  } else {
-    box.innerHTML = INS_HE;
-    $('insLang').textContent = 'English';
-    box.setAttribute('dir','rtl');
-    box.style.textAlign = 'right';
+  if(INS_LANG==='en'){
+    CNT.innerHTML = INS_EN;
+    BTN_LANG.textContent = 'עברית';
+    CNT.removeAttribute('dir');
+    CNT.style.textAlign = 'start';
+  }else{
+    CNT.innerHTML = INS_HE;
+    BTN_LANG.textContent = 'English';
+    CNT.setAttribute('dir','rtl');
+    CNT.style.textAlign = 'right';
   }
 }
+function openInstructions(){
+  MODAL.classList.remove('hidden');
+  renderInstructions();
+}
+function closeInstructions(){
+  MODAL.classList.add('hidden');
+}
 
-/* 4) Global delegation so it works even if button mounts later */
 document.addEventListener('click', (e)=>{
-  // open
-  if (e.target && e.target.id === 'instructionsBtn') {
-    const modal = $('instructionsModal');
-    if (modal){ modal.classList.remove('hidden'); renderInstructions(); }
-  }
-  // close
-  if (e.target && e.target.id === 'insClose') {
-    $('instructionsModal')?.classList.add('hidden');
-  }
-  // switch language
-  if (e.target && e.target.id === 'insLang') {
-    INS_LANG = (INS_LANG === 'en') ? 'he' : 'en';
-    renderInstructions();
-  }
+  if(e.target && e.target.id==='instructionsBtn') openInstructions();
 });
+BTN_X.onclick = closeInstructions;
+BTN_LANG.onclick = ()=>{ INS_LANG = (INS_LANG==='en'?'he':'en'); renderInstructions(); };
 
 /* ========= Boot ========= */
 updateLevelBadge(); show('lobby'); drawSideHUD();
