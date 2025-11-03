@@ -1,4 +1,4 @@
-/* Zen Dragon v9.6 — modular JS (clean full file) */
+/* Zen Dragon v9.6 — modular JS (full, with Instructions modal) */
 
 /* ========= Shortcuts ========= */
 const $ = id => document.getElementById(id);
@@ -38,11 +38,10 @@ let combatTopicStats = {
 let combatTopicRts = { m:[], pow:[], root:[], frac:[] };
 
 function resetCombatStats(){
-  combatTopicStats.m.seen=0;   combatTopicStats.m.wrong=0;
-  combatTopicStats.pow.seen=0; combatTopicStats.pow.wrong=0;
-  combatTopicStats.root.seen=0;combatTopicStats.root.wrong=0;
-  combatTopicStats.frac.seen=0;combatTopicStats.frac.wrong=0;
-  combatTopicRts.m=[]; combatTopicRts.pow=[]; combatTopicRts.root=[]; combatTopicRts.frac=[];
+  for(const k of ["m","pow","root","frac"]){
+    combatTopicStats[k].seen=0; combatTopicStats[k].wrong=0;
+    combatTopicRts[k]=[];
+  }
 }
 
 const saveUnlocks=()=>localStorage.setItem('zenUnlocks',JSON.stringify(UNL));
@@ -523,6 +522,148 @@ $('startBtn').addEventListener('click',beginBattle);
 
 // ONLY keep Home static; "Again" is dynamic inside end()
 $('btnHome').addEventListener('click',function(){ $('summary').style.display='none'; show('lobby') });
+
+/* ========= Instructions Modal (dynamic) ========= */
+/* 1) Inject modal container to DOM (works without touching index.html) */
+(function injectInstructionsModal(){
+  const modalHTML = `
+  <div id="instructionsModal" class="hidden" style="
+      position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+      background:rgba(0,0,0,.65); z-index:1000;">
+    <div style="max-width:880px; width:92%; max-height:90vh; overflow:auto;
+                background:#0f1830; color:#e8eeff; border:1px solid #27345d; border-radius:16px; padding:24px;">
+      <div style="display:flex; gap:8px; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <button id="insClose" class="btn">✖</button>
+        <div style="display:flex; gap:8px;">
+          <button id="insLang" class="btn">עברית</button>
+        </div>
+      </div>
+      <div id="insContent" style="font-size:16px; line-height:1.55;"></div>
+    </div>
+  </div>`;
+  document.body.insertAdjacentHTML('beforeend', modalHTML);
+})();
+
+/* 2) Texts (HE high-quality + EN polished) */
+const INS_HE = `
+<div dir="rtl" style="text-align:right">
+<h2>הוראות שימוש</h2>
+
+<h3>מה המטרה?</h3>
+אימון ממוקד לפיתוח מהירות, דיוק וביטחון בחישוב בראש: לוח כפל, חזקות, שורשים ושברים.
+המשחק מאתר את החולשות שלך בזמן אמת ודוחף אותך להשתפר בצורה חכמה והדרגתית.
+
+<h3>מצבי משחק</h3>
+<b>⚔️ מצב קרב (Combat)</b><br>
+תרגול משולב מכל הנושאים, לפי רמת קושי. לאחר כל קרב תופיע טבלת הישגים, ניתוח ביצועים, והמלצה מדויקת מה לחזק.
+
+<br><br>
+<b>📚 מצב תרגול (Practice)</b><br>
+בחירה של נושא אחד והעמקה בו. טעויות נשמרות ומופיעות מחדש באימון ייעודי לנטרול חולשות לאורך זמן.
+
+<h3>איך מתחילים?</h3>
+בוחרים רמה → Start Battle. הזמן מתחיל להימדד רק מהרגע שלוחצים על Start.
+
+<h3>איך עונים?</h3>
+מקשי 1–4 או לחיצה על האפשרות במסך. תשובה נכונה תנגן צליל קצר.
+
+<h3>קריטריונים לעליית רמה</h3>
+(ממוצע של 3 הקרבות האחרונים)<br>
+• דיוק ≥ 95%<br>
+• זמן ממוצע לשאלה ≤ 1.50 שניות<br>
+• ≤ 3 טעויות לקרב
+
+<h3>ה־HUD (לוח התקדמות בצד)</h3>
+מציג נתונים משלושת הקרבות האחרונים: דיוק ממוצע, זמן תשובה ממוצע, כמות טעויות, ו־Weak Topics — נושאים לחיזוק.
+
+<h3>איך מזוהות חולשות?</h3>
+<b>⏱ זמן תגובה איטי:</b> אם ביותר מ־50% מהשאלות בנושא מסוים היית איטי מהממוצע שלך — הנושא יסומן לעדיפות תרגול (מופיע ראשון).<br>
+<b>✖ שיעור טעויות גבוה:</b> אם טעית ב־40% ומעלה מהשאלות בנושא. הנושאים האיטיים מוצגים קודם (זמן הוא אויב משמעותי בפסיכומטרי).
+
+<h3>איך עובדת מערכת תיקון טעויות?</h3>
+בתרגול, כל טעות נשמרת. כדי למחוק אותה צריך לענות עליה נכון פעמיים בשני סשנים נפרדים של Review (וביניהם שני אימונים רגילים).
+כך מיומנות נבנית יציב — לא במקרה.
+
+<h3>טיפ חשוב</h3>
+אל תיעצר על שאלה. זרום. המערכת תחזיר אותך בדיוק למה שדורש חיזוק — אתה מתאמן, לא נבחן.
+</div>
+`;
+
+const INS_EN = `
+<h2>Instructions</h2>
+
+<h3>Purpose</h3>
+Boost mental calculation speed, accuracy, and confidence — multiplication, powers, roots, and fractions.
+The system tracks weaknesses in real time and adapts training gradually for smart improvement.
+
+<h3>Game Modes</h3>
+<b>⚔️ Combat</b><br>
+Mixed questions by difficulty. After each battle you get a performance report and precise recommendations.
+
+<br><br>
+<b>📚 Practice</b><br>
+Focus on a single topic. Mistakes are saved and resurfaced in structured review sessions to eliminate weaknesses over time.
+
+<h3>How to start</h3>
+Choose difficulty → Start Battle. Timing begins only after you press Start.
+
+<h3>How to answer</h3>
+Keys 1–4 or click. A short chime plays on correct answers.
+
+<h3>Ranking up (avg of last 3 battles)</h3>
+• Accuracy ≥ 95%<br>
+• Avg response ≤ 1.50s<br>
+• ≤ 3 mistakes per battle
+
+<h3>HUD (side panel)</h3>
+Shows averages from your last 3 battles: accuracy, response speed, mistakes, and Weak Topics to target.
+
+<h3>Weakness detection</h3>
+<b>⏱ Slow:</b> >50% of a topic’s questions were slower than your battle average → speed priority (listed first).<br>
+<b>✖ Errors:</b> ≥40% wrong in a topic → targeted for accuracy. Speed weaknesses appear first.
+
+<h3>Mistake Bank</h3>
+In practice mode, mistakes stay saved. To erase one, answer it correctly twice in two separate reviews with normal sessions in between.
+
+<h3>Pro tip</h3>
+Don’t freeze. Flow. The system will circle back and drill exactly what you need.
+`;
+
+/* 3) Behavior */
+let INS_LANG = 'en';
+function renderInstructions(){
+  const box = $('insContent');
+  if (!box) return;
+  if (INS_LANG === 'en') {
+    box.innerHTML = INS_EN;
+    $('insLang').textContent = 'עברית';
+    box.removeAttribute('dir');
+    box.style.textAlign = 'start';
+  } else {
+    box.innerHTML = INS_HE;
+    $('insLang').textContent = 'English';
+    box.setAttribute('dir','rtl');
+    box.style.textAlign = 'right';
+  }
+}
+
+/* 4) Global delegation so it works even if button mounts later */
+document.addEventListener('click', (e)=>{
+  // open
+  if (e.target && e.target.id === 'instructionsBtn') {
+    const modal = $('instructionsModal');
+    if (modal){ modal.classList.remove('hidden'); renderInstructions(); }
+  }
+  // close
+  if (e.target && e.target.id === 'insClose') {
+    $('instructionsModal')?.classList.add('hidden');
+  }
+  // switch language
+  if (e.target && e.target.id === 'insLang') {
+    INS_LANG = (INS_LANG === 'en') ? 'he' : 'en';
+    renderInstructions();
+  }
+});
 
 /* ========= Boot ========= */
 updateLevelBadge(); show('lobby'); drawSideHUD();
