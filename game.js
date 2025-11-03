@@ -433,6 +433,7 @@ document.getElementById('app').innerHTML = `
       <p>Sharpen the mind. Train the warrior.</p>
       <button id="toCombat" class="bigbtn">⚔️ Combat Mode</button>
       <button id="toPractice" class="bigbtn">📚 Practice Mode</button>
+      <button id="instructionsBtn" class="bigbtn">📖 Instructions</button>
     </div>
   </section>
 
