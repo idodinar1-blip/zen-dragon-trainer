@@ -7,7 +7,8 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <!-- אפליקציה נטענת מ-game.js -->
+
+  <!-- האפליקציה נטענת מ-game.js -->
   <div id="app"></div>
 
   <!-- 📖 Instructions Modal -->
@@ -39,7 +40,7 @@
           <button id="tgSave" class="btn">Save</button>
         </div>
         <div class="targets-hint">
-          These goals update the HUD targets and your personal benchmarks (no auto-unlock).
+          These goals drive unlocks (based on the average of your last 3 battles per difficulty).
         </div>
       </div>
     </div>
@@ -58,7 +59,6 @@
   <h3>מצבי משחק</h3>
   <b>⚔️ מצב קרב (Combat)</b><br>
   תרגול משולב מכל הנושאים, לפי רמת קושי. לאחר כל קרב תופיע טבלת הישגים, ניתוח ביצועים, והמלצה מדויקת מה לחזק.
-
   <br><br>
   <b>📚 מצב תרגול (Practice)</b><br>
   בחירה של נושא אחד והעמקה בו. טעויות נשמרות ומופיעות מחדש באימון ייעודי לנטרול חולשות לאורך זמן.
@@ -70,64 +70,35 @@
   מקשי 1–4 או לחיצה על האפשרות במסך. תשובה נכונה תנגן צליל קצר.
 
   <h3>קריטריונים לעליית רמה</h3>
-  (ממוצע של 3 הקרבות האחרונים)<br>
-  • דיוק ≥ 95%<br>
-  • זמן ממוצע לשאלה ≤ 1.50 שניות<br>
-  • ≤ 3 טעויות לקרב
+  (ממוצע של 3 הקרבות האחרונים באותה רמה) — לפי היעדים שבחרת במסך “Goals”.
 
-  <h3>ה־HUD (לוח התקדמות בצד)</h3>
-  מציג נתונים משלושת הקרבות האחרונים: דיוק ממוצע, זמן תשובה ממוצע, כמות טעויות, ו־Weak Topics — נושאים לחיזוק.
+  <h3>ה־HUD</h3>
+  מציג ממוצעים משלושת הקרבות האחרונים + Weak Topics.
 
   <h3>איך מזוהות חולשות?</h3>
-  <b>⏱ זמן תגובה איטי:</b> אם ביותר מ־50% מהשאלות בנושא מסוים היית איטי מהממוצע שלך — הנושא יסומן לעדיפות תרגול (מופיע ראשון).<br>
-  <b>✖ שיעור טעויות גבוה:</b> אם טעית ב־40% ומעלה מהשאלות בנושא. הנושאים האיטיים מוצגים קודם (זמן הוא אויב משמעותי בפסיכומטרי).
+  <b>⏱ איטיות:</b> >50% איטי מהממוצע (עם באפר לשורשים/שברים).<br>
+  <b>✖ שגיאות:</b> ≥40% טעויות בנושא.
 
-  <h3>איך עובדת מערכת תיקון טעויות?</h3>
-  בתרגול, כל טעות נשמרת. כדי למחוק אותה צריך לענות עליה נכון פעמיים בשני סשנים נפרדים של Review (וביניהם שני אימונים רגילים).
-  כך מיומנות נבנית יציב — לא במקרה.
+  <h3>תיקון טעויות</h3>
+  טעות נמחקת אחרי 2 הצלחות בשני Review שונים עם סשנים רגילים ביניהם.
 
-  <h3>טיפ חשוב</h3>
-  אל תיעצר על שאלה. זרום. המערכת תחזיר אותך בדיוק למה שדורש חיזוק — אתה מתאמן, לא נבחן.
+  <h3>טיפ</h3>
+  לא נתקעים — זורמים. המערכת תחזיר אותך למה שצריך.
   </div>
   `;
   const INS_EN = `
   <h2>Instructions</h2>
-
   <h3>Purpose</h3>
   Boost mental calculation speed, accuracy, and confidence — multiplication, powers, roots, and fractions.
-  The system tracks weaknesses in real time and adapts training gradually for smart improvement.
-
   <h3>Game Modes</h3>
-  <b>⚔️ Combat</b><br>
-  Mixed questions by difficulty. After each battle you get a performance report and precise recommendations.
-
-  <br><br>
-  <b>📚 Practice</b><br>
-  Focus on a single topic. Mistakes are saved and resurfaced in structured review sessions to eliminate weaknesses over time.
-
-  <h3>How to start</h3>
-  Choose difficulty → Start Battle. Timing begins only after you press Start.
-
-  <h3>How to answer</h3>
-  Keys 1–4 or click. A short chime plays on correct answers.
-
-  <h3>Ranking up (avg of last 3 battles)</h3>
-  • Accuracy ≥ 95%<br>
-  • Avg response ≤ 1.50s<br>
-  • ≤ 3 mistakes per battle
-
-  <h3>HUD (side panel)</h3>
-  Shows averages from your last 3 battles: accuracy, response speed, mistakes, and Weak Topics to target.
-
-  <h3>Weakness detection</h3>
-  <b>⏱ Slow:</b> >50% of a topic’s questions were slower than your battle average (with buffer) → speed priority (listed first).<br>
-  <b>✖ Errors:</b> ≥40% wrong in a topic → targeted for accuracy.
-
+  <b>⚔️ Combat</b> mixed by difficulty; report & recommendations after each battle.
+  <br><br><b>📚 Practice</b> focus one topic; mistakes resurface in structured reviews.
+  <h3>Unlocks</h3>
+  Based on your custom goals (average of the last 3 battles per difficulty).
+  <h3>Answering</h3>
+  Keys 1–4 or click. Chime on correct.
   <h3>Mistake Bank</h3>
-  In practice mode, mistakes stay saved. To erase one, answer it correctly twice in two separate reviews with normal sessions in between.
-
-  <h3>Pro tip</h3>
-  Don’t freeze. Flow. The system will circle back and drill exactly what you need.
+  Erase after 2 correct answers across 2 separate reviews with normal sessions in between.
   `;
 
   /* Modal logic */
@@ -142,11 +113,9 @@
   }
   document.getElementById('closeInstructions').onclick = () => insModal.classList.add('hidden');
   document.getElementById('langToggle').onclick = () => { INS_LANG = (INS_LANG==='en')?'he':'en'; renderInstructions(); };
-
-  // משחק יפתח את המודל ע"י כפתור עם id="instructionsBtn"
   window.__openInstructions = () => { insModal.classList.remove('hidden'); renderInstructions(); };
 
-  // Goals modal logic (called from game)
+  /* ===== Goals modal wiring (used by game.js) ===== */
   const tgModal = document.getElementById('targetsModal');
   const tgAcc   = document.getElementById('tgAcc');
   const tgAvg   = document.getElementById('tgAvg');
@@ -167,14 +136,13 @@
 
   document.getElementById('tgClose').onclick = () => window.__closeTargets();
   document.getElementById('tgSave').onclick  = () => { window.__saveTargetsFromModal && window.__saveTargetsFromModal(); };
-  document.getElementById('tgReset').onclick = () => {
-    tgAcc.value=95; tgAvg.value=1500; tgMist.value=3;
-  };
+  document.getElementById('tgReset').onclick = () => { tgAcc.value=95; tgAvg.value=1500; tgMist.value=3; };
   </script>
 
   <script src="game.js"></script>
 </body>
 </html>
+
 
 
 
