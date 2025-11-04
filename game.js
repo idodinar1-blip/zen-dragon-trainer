@@ -1,4 +1,4 @@
-/* Zen Dragon v9.9 — custom-goal unlocks per difficulty + fractions fix + buffers */
+/* Zen Dragon v10.1 — unlocks fixed (per-difficulty, immediate), popup alert, fraction distractors improved */
 
 /* ========= Shortcuts ========= */
 const $ = id => document.getElementById(id);
@@ -23,7 +23,7 @@ let MODE='combat', DIFF='easy', TOPIC='m', LENGTH=20;
 let qs=[], i=0, score=0, total=0, rts=[], isReview=false;
 
 let UNL   = JSON.parse(localStorage.getItem('zenUnlocks')||'{"medium":false,"hard":false}');
-let COMHIST = JSON.parse(localStorage.getItem('zenCombatSessions')||'[]'); // will store {diff,...}
+let COMHIST = JSON.parse(localStorage.getItem('zenCombatSessions')||'[]'); // each: {diff, acc, avg, bank, ...}
 let PMIST = JSON.parse(localStorage.getItem('zenPracticeMistakesV2')||'{"m":[],"pow":[],"root":[],"frac":[]}');
 let PCOUNT= JSON.parse(localStorage.getItem('zenPracticeCountsV2')||'{"m":0,"pow":0,"root":0,"frac":0}');
 
@@ -41,7 +41,7 @@ function resetCombatStats(){ for(const k of ["m","pow","root","frac"]){ combatTo
 
 /* ======= Persistence helpers ======= */
 const saveUnlocks=()=>localStorage.setItem('zenUnlocks',JSON.stringify(UNL));
-const saveComHist=()=>localStorage.setItem('zenCombatSessions',JSON.stringify(COMHIST.slice(-40))); // keep more history
+const saveComHist=()=>localStorage.setItem('zenCombatSessions',JSON.stringify(COMHIST.slice(-60))); // keep more history
 const savePMist=()=>localStorage.setItem('zenPracticeMistakesV2',JSON.stringify(PMIST));
 const savePCount=()=>localStorage.setItem('zenPracticeCountsV2',JSON.stringify(PCOUNT));
 
@@ -79,8 +79,8 @@ function pick4(ans,topic){
     const pushIf = (N,D)=>{
       const [nn,dd] = _simpPair(N,D);
       const s = _fmt(nn,dd);
-      if (dd===1) return false;                    // no integers as distractors
-      if (nn===n0 && dd===d0) return false;        // not the correct
+      if (dd===1) return false;                    // בלי הסחות של מספרים שלמים
+      if (nn===n0 && dd===d0) return false;        // לא התשובה
       if (!set.has(s)) { set.add(s); return true; }
       return false;
     };
@@ -138,12 +138,12 @@ function last3StatsAll(){
   return {acc,avg,mist};
 }
 function last3StatsByDiff(diff){
-  const arr = COMHIST.filter(r=>r.diff===diff).slice(-3);
-  if(arr.length===0) return {acc:null,avg:null,mist:null};
+  const arr = COMHIST.filter(r=>r && r.diff===diff).slice(-3);
+  if(arr.length===0) return {acc:null,avg:null,mist:null,count:0};
   let acc=arr.reduce((s,x)=>s+(x.acc||0),0)/arr.length;
   let avg=arr.reduce((s,x)=>s+(x.avg||0),0)/arr.length;
   let mist=arr.reduce((s,x)=>s+(x.bank||0),0)/arr.length;
-  return {acc,avg,mist, count:arr.length};
+  return {acc,avg,mist,count:arr.length};
 }
 function hudHintText(){
   return `Targets (avg of last 3): Acc ≥ <b>${TARGETS.acc}%</b> • Avg ≤ <b>${(TARGETS.avgMs/1000).toFixed(2)}s</b> • Mistakes ≤ <b>${TARGETS.mist}</b>.`;
@@ -289,7 +289,8 @@ function pick(v,a,item){
 
 /* ========= Confetti ========= */
 function confetti(){
-  const layer=$('confetti'); layer?.classList.remove('hidden');
+  const layer=$('confetti'); if(!layer) return;
+  layer.classList.remove('hidden');
   const W=innerWidth,H=innerHeight;
   for(let k=0;k<140;k++){
     let d=document.createElement('div'); d.className='conf';
@@ -302,40 +303,40 @@ function confetti(){
     layer.appendChild(d);
     setTimeout(()=>{ d.remove(); }, time+80);
   }
-  setTimeout(()=> layer?.classList.add('hidden'), 3000);
+  setTimeout(()=> layer.classList.add('hidden'), 3000);
 }
 
 /* ========= Unlock logic (uses TARGETS, per-difficulty) ========= */
 function meetsTargets(stats){
-  if (stats.count !== undefined && stats.count < 3) return false;
+  if ((stats.count ?? 0) < 3) return false;
   if (stats.acc==null || stats.avg==null || stats.mist==null) return false;
   const accOK  = stats.acc >= TARGETS.acc;
   const avgOK  = stats.avg <= TARGETS.avgMs;
   const mistOK = stats.mist <= TARGETS.mist;
   return accOK && avgOK && mistOK;
 }
-function maybeUnlock(currentDiff){
-  // unlock Medium if EASY meets targets; unlock Hard if MEDIUM meets targets
+function maybeUnlockImmediate(){
   let unlockedMsg = '';
 
+  // אם עוד לא פתוח Medium — בדוק Easy
   if (!UNL.medium){
     const sEasy = last3StatsByDiff('easy');
     if (meetsTargets(sEasy)){
-      UNL.medium = true; saveUnlocks();
-      unlockedMsg += '✅ Medium unlocked!<br>';
+      UNL.medium = true; saveUnlocks(); updateLevelBadge();
+      unlockedMsg += 'Medium unlocked!';
     }
   }
+  // אם Medium פתוח אבל Hard לא — בדוק Medium
   if (UNL.medium && !UNL.hard){
     const sMed = last3StatsByDiff('medium');
     if (meetsTargets(sMed)){
-      UNL.hard = true; saveUnlocks();
-      unlockedMsg += '✅ Hard unlocked!<br>';
+      UNL.hard = true; saveUnlocks(); updateLevelBadge();
+      unlockedMsg += (unlockedMsg? ' ' : '') + 'Hard unlocked!';
     }
   }
   if (unlockedMsg){
-    updateLevelBadge();
+    alert(unlockedMsg); // הודעה קופצת פשוטה כפי שביקשת
   }
-  return unlockedMsg;
 }
 
 /* ========= End Session ========= */
@@ -374,9 +375,9 @@ function end(){
       })
       .map(k => topicMap[k]);
 
-    // persist this combat (include diff!)
+    // persist this combat (כולל diff!)
     COMHIST.push({
-      diff: DIFF,
+      diff: DIFF || 'easy',
       acc, avg,
       bank: bankCount,
       correct: score,
@@ -384,12 +385,12 @@ function end(){
       weakErrList, weakDwellList,
       ts: Date.now()
     });
-    resetCombatStats(); saveComHist();
+    saveComHist(); // נשמור לפני הבדיקה
+    resetCombatStats();
 
-    // check unlocks against TARGETS (per difficulty)
-    const unlockedMsg = maybeUnlock(DIFF);
-    $('sumPracticeExtra').innerHTML = unlockedMsg || '';
-    if (unlockedMsg) confetti(); // extra yay when unlocking
+    // בדוק מייד פתיחת שלבים + פופאפ
+    maybeUnlockImmediate();
+    $('sumPracticeExtra').textContent = '';
   }
 
   $('sumLines').innerHTML =
