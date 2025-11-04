@@ -1,4 +1,4 @@
-/* Zen Dragon v9.8 — fractions distractors fix + goals modal + dwell buffers */
+/* Zen Dragon v9.9 — custom-goal unlocks per difficulty + fractions fix + buffers */
 
 /* ========= Shortcuts ========= */
 const $ = id => document.getElementById(id);
@@ -23,66 +23,33 @@ let MODE='combat', DIFF='easy', TOPIC='m', LENGTH=20;
 let qs=[], i=0, score=0, total=0, rts=[], isReview=false;
 
 let UNL   = JSON.parse(localStorage.getItem('zenUnlocks')||'{"medium":false,"hard":false}');
-let COMHIST = JSON.parse(localStorage.getItem('zenCombatSessions')||'[]');
+let COMHIST = JSON.parse(localStorage.getItem('zenCombatSessions')||'[]'); // will store {diff,...}
 let PMIST = JSON.parse(localStorage.getItem('zenPracticeMistakesV2')||'{"m":[],"pow":[],"root":[],"frac":[]}');
 let PCOUNT= JSON.parse(localStorage.getItem('zenPracticeCountsV2')||'{"m":0,"pow":0,"root":0,"frac":0}');
 
-/* ======= User Targets (affect HUD text only) ======= */
+/* ======= User Targets (drive unlocks) ======= */
 let TARGETS = JSON.parse(localStorage.getItem('zenTargets')||'{"acc":95,"avgMs":1500,"mist":3}');
 function saveTargets(){ localStorage.setItem('zenTargets', JSON.stringify(TARGETS)); }
 
-/* ======= Dwell buffers (ms) to be fair for roots/fractions ======= */
+/* ======= Dwell buffers (ms) for roots/fractions ======= */
 const SLOW_BUFFER = { m:0, pow:0, root:120, frac:250 };
 
 /* ======= Per-combat topic stats ======= */
-let combatTopicStats = {
-  m:    { seen: 0, wrong: 0 },
-  pow:  { seen: 0, wrong: 0 },
-  root: { seen: 0, wrong: 0 },
-  frac: { seen: 0, wrong: 0 }
-};
-let combatTopicRts = { m:[], pow:[], root:[], frac:[] };
-function resetCombatStats(){
-  for(const k of ["m","pow","root","frac"]){
-    combatTopicStats[k].seen=0; combatTopicStats[k].wrong=0;
-    combatTopicRts[k]=[];
-  }
-}
+let combatTopicStats = { m:{seen:0,wrong:0}, pow:{seen:0,wrong:0}, root:{seen:0,wrong:0}, frac:{seen:0,wrong:0} };
+let combatTopicRts   = { m:[], pow:[], root:[], frac:[] };
+function resetCombatStats(){ for(const k of ["m","pow","root","frac"]){ combatTopicStats[k].seen=0; combatTopicStats[k].wrong=0; combatTopicRts[k]=[]; } }
 
+/* ======= Persistence helpers ======= */
 const saveUnlocks=()=>localStorage.setItem('zenUnlocks',JSON.stringify(UNL));
-const saveComHist=()=>localStorage.setItem('zenCombatSessions',JSON.stringify(COMHIST.slice(-6)));
+const saveComHist=()=>localStorage.setItem('zenCombatSessions',JSON.stringify(COMHIST.slice(-40))); // keep more history
 const savePMist=()=>localStorage.setItem('zenPracticeMistakesV2',JSON.stringify(PMIST));
 const savePCount=()=>localStorage.setItem('zenPracticeCountsV2',JSON.stringify(PCOUNT));
 
 /* ========= Pools ========= */
 const rand=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
-
-const mulPool=(A,B)=>{
-  let out=[];
-  A.forEach(x=>B.forEach(y=>out.push({t:`${x}×${y}`,a:String(x*y),topic:'m'})));
-  return out;
-};
-function powPool(){
-  let out=[];
-  for(let n=1;n<=14;n++) out.push({t:`${n}²`,a:String(n*n),topic:'pow'});
-  for(let n=2;n<=6;n++) out.push({t:`${n}³`,a:String(n*n*n),topic:'pow'});
-  out.push(
-    {t:'2⁴',a:'16',topic:'pow'},{t:'3⁴',a:'81',topic:'pow'},
-    {t:'2⁵',a:'32',topic:'pow'},{t:'2⁶',a:'64',topic:'pow'}
-  );
-  return out;
-}
-function rootPool(){
-  let out=[];
-  [4,9,16,25,36,49,64,81,100,121,144,169,196]
-    .forEach(v=>out.push({t:`√${v}`,a:String(Math.sqrt(v)),topic:'root'}));
-  [8,27,64,125,216]
-    .forEach(v=>out.push({t:`³√${v}`,a:String(Math.cbrt(v)),topic:'root'}));
-  [16,81]
-    .forEach(v=>out.push({t:`⁴√${v}`,a:String(Math.round(Math.pow(v,1/4))),topic:'root'}));
-  out.push({t:'⁵√32',a:'2',topic:'root'},{t:'⁶√64',a:'2',topic:'root'});
-  return out;
-}
+const mulPool=(A,B)=>{ let out=[]; A.forEach(x=>B.forEach(y=>out.push({t:`${x}×${y}`,a:String(x*y),topic:'m'}))); return out; };
+function powPool(){ let out=[]; for(let n=1;n<=14;n++) out.push({t:`${n}²`,a:String(n*n),topic:'pow'}); for(let n=2;n<=6;n++) out.push({t:`${n}³`,a:String(n*n*n),topic:'pow'}); out.push({t:'2⁴',a:'16',topic:'pow'},{t:'3⁴',a:'81',topic:'pow'},{t:'2⁵',a:'32',topic:'pow'},{t:'2⁶',a:'64',topic:'pow'}); return out; }
+function rootPool(){ let out=[]; [4,9,16,25,36,49,64,81,100,121,144,169,196].forEach(v=>out.push({t:`√${v}`,a:String(Math.sqrt(v)),topic:'root'})); [8,27,64,125,216].forEach(v=>out.push({t:`³√${v}`,a:String(Math.cbrt(v)),topic:'root'})); [16,81].forEach(v=>out.push({t:`⁴√${v}`,a:String(Math.round(Math.pow(v,1/4))),topic:'root'})); out.push({t:'⁵√32',a:'2',topic:'root'},{t:'⁶√64',a:'2',topic:'root'}); return out; }
 function fracPool(){
   let out=[];
   for(let k=0;k<14;k++){
@@ -91,72 +58,51 @@ function fracPool(){
     let g=(m,n)=>{while(n){[m,n]=[n,m%n]}return Math.abs(m)};
     let gg=g(n,d);
     let simp=(n/gg)+'/'+(d/gg);
-    if (d/gg==1) simp=String(n/gg); // תשובה נכונה יכולה להיות גם שלם
+    if (d/gg==1) simp=String(n/gg);
     out.push({t:`${n}/${d}`,a:simp,topic:'frac'});
   }
   return out;
 }
 
-/* ========= Helpers for FRACTIONS ========= */
+/* ========= FRACTIONS helpers & pick4 ========= */
 function _gcd(a,b){ a=Math.abs(a); b=Math.abs(b); while(b){ [a,b]=[b,a%b]; } return a||1; }
-function _simpPair(N,D){
-  if(D===0) return [1,0];
-  const s=(D<0?-1:1); N*=s; D*=s;
-  const g=_gcd(N,D); return [N/g, D/g];
-}
-function _fmt(N,D){
-  // if denominator == 1, keep integer as "N" (for CORRECT answer allowed),
-  // but for DISTRACTORS אנחנו נמנע מזה (נפסול בהמשך).
-  return (D===1) ? String(N) : (N+"/"+D);
-}
+function _simpPair(N,D){ if(D===0) return [1,0]; const s=(D<0?-1:1); N*=s; D*=s; const g=_gcd(N,D); return [N/g, D/g]; }
+function _fmt(N,D){ return (D===1) ? String(N) : (N+"/"+D); }
 function _isFracStr(str){ return typeof str==="string" && /^\s*-?\d+\s*\/\s*-?\d+\s*$/.test(str); }
 
-/* ========= Answers (fixed FRACTIONS distractors) ========= */
 function pick4(ans,topic){
-  // If correct answer is a fraction string (contains '/'), ensure 3+ fraction distractors (no integers)
   if (_isFracStr(ans)){
     let [n0,d0] = ans.split('/').map(x=>parseInt(x.trim(),10));
-    [n0,d0] = _simpPair(n0,d0); // normalized correct
+    [n0,d0] = _simpPair(n0,d0);
 
     const set = new Set();
     const pushIf = (N,D)=>{
       const [nn,dd] = _simpPair(N,D);
       const s = _fmt(nn,dd);
-      // skip invalid/duplicate/equal-to-ans, and skip distractors that simplify to integer (dd==1)
-      if (dd===1) return false;
-      if (nn===n0 && dd===d0) return false;
+      if (dd===1) return false;                    // no integers as distractors
+      if (nn===n0 && dd===d0) return false;        // not the correct
       if (!set.has(s)) { set.add(s); return true; }
       return false;
     };
 
-    // seed candidates around the correct ratio
     const tryCand = [
-      [n0+1, d0],[n0-1, d0],[n0+2, d0],[n0-2, d0],
-      [n0, d0+1],[n0, d0-1],[n0, d0+2],[n0, d0-2],
-      [n0*2+1, d0*2],[n0*3-1, d0*3],[n0*2-1, d0*3+1],
-      [n0*d0+1, d0*d0], [n0*d0-1, d0*d0+1]
+      [n0+1,d0],[n0-1,d0],[n0+2,d0],[n0-2,d0],
+      [n0,d0+1],[n0,d0-1],[n0,d0+2],[n0,d0-2],
+      [n0*2+1,d0*2],[n0*3-1,d0*3],[n0*2-1,d0*3+1],
+      [n0*d0+1,d0*d0],[n0*d0-1,d0*d0+1]
     ];
-    for(const [N,D] of tryCand){
-      if (set.size>=3) break;
-      if (D && D!==0) pushIf(N,D);
-    }
-    // random nearby if needed
+    for(const [N,D] of tryCand){ if (set.size>=3) break; if (D && D!==0) pushIf(N,D); }
     while(set.size<3){
       const N = n0 + (Math.floor(Math.random()*7)-3);
       let   D = d0 + (Math.floor(Math.random()*7)-3);
-      if (D===0) continue;
-      if (D<0){ D=-D; }
+      if (D===0) continue; if (D<0){ D=-D; }
       pushIf(N,D);
     }
-
-    // build final options: include the correct answer (possibly integer or fraction),
-    // but make sure at least 3 others contain '/'
     const opts = [ _fmt(n0,d0), ...set.values() ];
-    // if correct formatted ended as integer (d0==1), still fine; distractors are proper fractions.
     return opts.slice(0,4).sort(()=>Math.random()-.5).map(v=>({v,topic}));
   }
 
-  // numeric answers: keep numbers; (small tweak avoids NaN/dups)
+  // numeric
   let s=new Set([ans]);
   let num=parseFloat(ans);
   while(s.size<4){
@@ -183,7 +129,7 @@ const practicePool=(topic)=> []
   .filter(x=>x.topic===topic);
 
 /* ========= HUD ========= */
-function last3Stats(){
+function last3StatsAll(){
   let h=COMHIST.slice(-3);
   if(h.length===0) return {acc:null,avg:null,mist:null};
   let acc=h.reduce((s,x)=>s+(x.acc||0),0)/h.length;
@@ -191,12 +137,20 @@ function last3Stats(){
   let mist=h.reduce((s,x)=>s+(x.bank||0),0)/h.length;
   return {acc,avg,mist};
 }
+function last3StatsByDiff(diff){
+  const arr = COMHIST.filter(r=>r.diff===diff).slice(-3);
+  if(arr.length===0) return {acc:null,avg:null,mist:null};
+  let acc=arr.reduce((s,x)=>s+(x.acc||0),0)/arr.length;
+  let avg=arr.reduce((s,x)=>s+(x.avg||0),0)/arr.length;
+  let mist=arr.reduce((s,x)=>s+(x.bank||0),0)/arr.length;
+  return {acc,avg,mist, count:arr.length};
+}
 function hudHintText(){
   return `Targets (avg of last 3): Acc ≥ <b>${TARGETS.acc}%</b> • Avg ≤ <b>${(TARGETS.avgMs/1000).toFixed(2)}s</b> • Mistakes ≤ <b>${TARGETS.mist}</b>.`;
 }
 function drawSideHUD(){
   if(MODE!=='combat') return;
-  const s=last3Stats();
+  const s=last3StatsAll();
   $('hudAcc').textContent=(s.acc==null)?'—':s.acc.toFixed(0)+'%';
   $('hudSpd').textContent=(s.avg==null)?'—':(s.avg/1000).toFixed(2)+'s';
   $('hudBank').textContent=(s.mist==null)?'—':s.mist.toFixed(2);
@@ -272,6 +226,7 @@ function enterGame(showSide){
   if(MODE==='practice') render();
 }
 
+/* ========= Render & Pick ========= */
 function render(){
   if(i>=total){ end(); return; }
   const item=qs[i];
@@ -292,7 +247,6 @@ document.addEventListener('keydown',e=>{
     if(btns[idx]) btns[idx].click();
   }
 });
-
 function ensureMist(topic,item){
   PMIST[topic]=PMIST[topic]||[];
   let idx=PMIST[topic].findIndex(x=>x.t===item.t&&x.a===item.a);
@@ -301,12 +255,8 @@ function ensureMist(topic,item){
 }
 function markReview(topic,item,ok){
   let idx=PMIST[topic].findIndex(x=>x.t===item.t&&x.a===item.a);
-  if(idx!==-1){
-    PMIST[topic][idx].streak= ok ? (PMIST[topic][idx].streak||0)+1 : 0;
-    savePMist();
-  }
+  if(idx!==-1){ PMIST[topic][idx].streak= ok ? (PMIST[topic][idx].streak||0)+1 : 0; savePMist(); }
 }
-
 function pick(v,a,item){
   const rt=performance.now()-window.__t;
   rts.push(rt);
@@ -355,6 +305,39 @@ function confetti(){
   setTimeout(()=> layer?.classList.add('hidden'), 3000);
 }
 
+/* ========= Unlock logic (uses TARGETS, per-difficulty) ========= */
+function meetsTargets(stats){
+  if (stats.count !== undefined && stats.count < 3) return false;
+  if (stats.acc==null || stats.avg==null || stats.mist==null) return false;
+  const accOK  = stats.acc >= TARGETS.acc;
+  const avgOK  = stats.avg <= TARGETS.avgMs;
+  const mistOK = stats.mist <= TARGETS.mist;
+  return accOK && avgOK && mistOK;
+}
+function maybeUnlock(currentDiff){
+  // unlock Medium if EASY meets targets; unlock Hard if MEDIUM meets targets
+  let unlockedMsg = '';
+
+  if (!UNL.medium){
+    const sEasy = last3StatsByDiff('easy');
+    if (meetsTargets(sEasy)){
+      UNL.medium = true; saveUnlocks();
+      unlockedMsg += '✅ Medium unlocked!<br>';
+    }
+  }
+  if (UNL.medium && !UNL.hard){
+    const sMed = last3StatsByDiff('medium');
+    if (meetsTargets(sMed)){
+      UNL.hard = true; saveUnlocks();
+      unlockedMsg += '✅ Hard unlocked!<br>';
+    }
+  }
+  if (unlockedMsg){
+    updateLevelBadge();
+  }
+  return unlockedMsg;
+}
+
 /* ========= End Session ========= */
 function end(){
   const acc = score / Math.max(1, total) * 100;
@@ -366,9 +349,7 @@ function end(){
 
     if (isReview) {
       let keep = [];
-      for (let it of (PMIST[TOPIC] || [])) {
-        if ((it.streak || 0) >= 2) { removed++; } else { keep.push(it); }
-      }
+      for (let it of (PMIST[TOPIC] || [])) { if ((it.streak || 0) >= 2) { removed++; } else { keep.push(it); } }
       PMIST[TOPIC] = keep; savePMist();
       $('sumPracticeExtra').textContent =
         'Removed from mistake bank: '+removed+'. Rule: each mistake is deleted only after TWO correct answers in TWO separate reviews (with two normal sessions in between).';
@@ -387,18 +368,28 @@ function end(){
     const weakDwellList = Object.keys(combatTopicRts)
       .filter(k => {
         const arr = combatTopicRts[k]; if(!arr.length) return false;
-        const thr = avg + (SLOW_BUFFER[k]||0); // buffer for roots/fractions
+        const thr = avg + (SLOW_BUFFER[k]||0);
         const slow = arr.filter(v=>v>thr).length;
         return (slow/arr.length) > 0.5;
       })
       .map(k => topicMap[k]);
 
-    COMHIST.push({ acc, avg, bank: bankCount, correct: score, total, weakErrList, weakDwellList, ts: Date.now() });
+    // persist this combat (include diff!)
+    COMHIST.push({
+      diff: DIFF,
+      acc, avg,
+      bank: bankCount,
+      correct: score,
+      total: total,
+      weakErrList, weakDwellList,
+      ts: Date.now()
+    });
+    resetCombatStats(); saveComHist();
 
-    resetCombatStats();
-    saveComHist();
-    $('sumPracticeExtra').textContent = '';
-    confetti();
+    // check unlocks against TARGETS (per difficulty)
+    const unlockedMsg = maybeUnlock(DIFF);
+    $('sumPracticeExtra').innerHTML = unlockedMsg || '';
+    if (unlockedMsg) confetti(); // extra yay when unlocking
   }
 
   $('sumLines').innerHTML =
@@ -523,7 +514,7 @@ document.addEventListener('click',(e)=>{
   if(e.target && e.target.id==='targetsBtn'){ window.__openTargets && window.__openTargets(TARGETS); }
 });
 
-/* ===== Handle saving targets from modal (index calls this) ===== */
+/* ===== Save targets from modal ===== */
 window.__saveTargetsFromModal = ()=>{
   const t = window.__readTargets ? window.__readTargets() : TARGETS;
   TARGETS = t; saveTargets();
