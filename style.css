@@ -41,7 +41,7 @@ body{
 /* Layout */
 #lobby,#combatMenu,#practiceMenu{height:100vh}
 .box{max-width:720px;width:92%;text-align:center}
-#game{display:grid;grid-template-columns:320px 1fr;gap:18px;padding:18px}
+#game{display:grid;grid-template-columns:320px 1fr;gap:18px;padding:18px;min-height:100vh}
 @media(max-width:900px){#game{grid-template-columns:1fr} #side{order:2}}
 #side,#main{padding:16px}
 .hudTitle{font-size:14px;letter-spacing:.12em;text-transform:uppercase;color:#bcd1ff;opacity:.9}
@@ -71,14 +71,4 @@ body{
 /* Confetti */
 #confetti{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:50}
 .conf{position:absolute;width:10px;height:14px;opacity:.9;will-change:transform}
-
-/* Modals */
-.modal{position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:1000}
-.modal-box{background:#0f1830;border:1px solid #27345d;border-radius:16px;color:#e8eeff;max-width:880px;width:92%;
-  max-height:90vh;overflow:auto;padding:24px}
-.modal-head{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:12px}
-.modal-body{font-size:16px;line-height:1.55}
-.targets-grid{display:grid;gap:12px}
-.targets-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:14px}
-.targets-hint{font-size:12px;color:#cfe2ff;opacity:.85;margin-top:8px}
 
